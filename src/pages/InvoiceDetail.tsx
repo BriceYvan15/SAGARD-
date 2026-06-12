@@ -1,35 +1,20 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
-import { ArrowLeft, Printer, CheckCircle, Clock, AlertCircle, ShieldCheck } from 'lucide-react'
-import { invoices } from '../data/mockData'
+import { ArrowLeft, Printer, Loader2, Mail, Phone, Globe } from 'lucide-react'
 import { fmt, fmtDate, daysOverdue } from '../lib/utils'
-
-const statusConfig = {
-  brouillon: { label: 'BROUILLON',   cls: 'bg-slate-200 text-slate-600' },
-  envoyee:   { label: 'ENVOYÉE',     cls: 'bg-blue-100 text-blue-700' },
-  payee:     { label: 'PAYÉE',       cls: 'bg-green-100 text-green-700' },
-  retard:    { label: 'EN RETARD',   cls: 'bg-red-100 text-red-700' },
-  annulee:   { label: 'ANNULÉE',     cls: 'bg-slate-100 text-slate-400' },
-}
-
-function HistoryIcon({ type }: { type: string }) {
-  const m: Record<string, { icon: any; cls: string }> = {
-    create:   { icon: CheckCircle, cls: 'text-blue-500' },
-    payment:  { icon: CheckCircle, cls: 'text-green-500' },
-    document: { icon: Clock,       cls: 'text-purple-500' },
-    note:     { icon: AlertCircle, cls: 'text-amber-500' },
-    status:   { icon: Clock,       cls: 'text-slate-400' },
-    update:   { icon: Clock,       cls: 'text-slate-400' },
-  }
-  const { icon: Icon, cls } = m[type] ?? m.note
-  return <Icon size={14} className={cls} />
-}
+import { useApi } from '../lib/useApi'
+import { getInvoice } from '../services/invoices.service'
+import logoSagard from '../assets/logo-sagard.jpg'
 
 export default function InvoiceDetail() {
   const { id } = useParams()
-  const nav = useNavigate()
-  const inv = invoices.find(i => i.id === id)
+  const nav    = useNavigate()
 
+  const { data: inv, loading } = useApi(() => getInvoice(id!), [id])
+
+  if (loading) return (
+    <div className="flex justify-center py-24"><Loader2 className="animate-spin text-slate-300" size={32} /></div>
+  )
   if (!inv) return (
     <div className="text-center py-24 text-slate-400">
       <p className="text-lg font-semibold">Facture introuvable</p>
@@ -37,124 +22,135 @@ export default function InvoiceDetail() {
     </div>
   )
 
-  const overdueDays = inv.status === 'retard' ? daysOverdue(inv.dueDate) : 0
-  const qrData = JSON.stringify({ ref: inv.reference, client: inv.clientName, montant: fmt(inv.totalAmount), statut: statusConfig[inv.status].label, date: fmtDate(inv.issueDate) })
+  const i = inv as any
+  const totalAmount = Number(i.totalAmount ?? 0)
+  const lines       = (i.lines ?? []) as any[]
+  const isPaid      = i.status === 'PAYEE'
+  const isAccepted  = i.status === 'ACCEPTEE'
+  const paymentLink = `https://pay.djamo.com/3waob`
+  const qrData      = paymentLink
+
+  const docType = i.type === 'DEVIS' ? 'Devis' : i.type === 'PROFORMA' ? 'Facture Proforma' : 'Facture'
+  const backPath = i.type === 'DEVIS' ? '/devis' : i.type === 'PROFORMA' ? '/proforma' : '/facturation'
+  const backLabel = i.type === 'DEVIS' ? 'Retour aux devis' : i.type === 'PROFORMA' ? 'Retour aux proforma' : 'Retour à la facturation'
+  const clientName = i.client?.name ?? i.lead?.companyName ?? i.lead?.contactName ?? '—'
 
   return (
     <div className="space-y-6">
-      {/* Toolbar */}
+      {/* Toolbar - not printed */}
       <div className="flex items-center justify-between no-print">
-        <button onClick={() => nav('/facturation')} className="flex items-center gap-2 text-slate-600 hover:text-slate-800 transition-colors text-sm font-medium">
-          <ArrowLeft size={16} /> Retour à la facturation
+        <button onClick={() => nav(backPath)} className="flex items-center gap-2 text-slate-600 hover:text-slate-800 transition-colors text-sm font-medium">
+          <ArrowLeft size={16} /> {backLabel}
         </button>
-        <div className="flex items-center gap-3">
-          {inv.status === 'retard' && (
-            <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 px-3 py-1.5 rounded-lg text-sm font-semibold">
-              <AlertCircle size={14} /> {overdueDays} jour{overdueDays > 1 ? 's' : ''} de retard
-            </div>
-          )}
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-2 bg-sagard-yellow text-sagard-dark px-4 py-2 rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark transition-colors"
-          >
-            <Printer size={16} /> Imprimer / PDF
-          </button>
-        </div>
+        <button
+          onClick={() => window.print()}
+          className="flex items-center gap-2 bg-[#C8A000] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#B08E00] transition-colors"
+        >
+          <Printer size={16} /> Imprimer / PDF
+        </button>
       </div>
 
-      {/* Invoice document */}
-      <div id="invoice-print" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden max-w-4xl mx-auto">
+      {/* Invoice document — reproducing the exact layout */}
+      <div id="invoice-print" className="bg-white shadow-lg max-w-[210mm] mx-auto relative" style={{ minHeight: '297mm', fontFamily: 'Arial, sans-serif' }}>
 
-        {/* Header band */}
-        <div className="bg-[#1E1E1E] px-8 py-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-[#C8D400] rounded-xl flex items-center justify-center">
-              <ShieldCheck size={26} className="text-[#1E1E1E]" />
-            </div>
-            <div>
-              <div className="text-white font-bold text-lg leading-tight">SAGARD SÉCURITÉ</div>
-              <div className="text-[#C8D400] text-xs font-medium tracking-widest">AGENCE DE SÉCURITÉ PRIVÉE</div>
+        {/* Payment ribbon — only on FACTURE, only PAYÉE / NON PAYÉE */}
+        {i.type === 'FACTURE' && (
+          <div className="absolute top-0 right-0 z-10 overflow-hidden w-44 h-44 pointer-events-none">
+            <div
+              className={`absolute top-7 -right-10 w-56 text-center py-2.5 text-[11px] font-black uppercase tracking-widest shadow-lg rotate-45 ${
+                isPaid ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+              }`}
+              style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' } as any}
+            >
+              {isPaid ? 'PAYÉE' : 'NON PAYÉE'}
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-[#C8D400] text-2xl font-black tracking-tight">FACTURE</div>
-            <div className="text-slate-300 font-mono text-sm mt-0.5">{inv.reference}</div>
-            <span className={`inline-block mt-1 text-xs font-bold px-2 py-0.5 rounded-full ${statusConfig[inv.status].cls}`}>
-              {statusConfig[inv.status].label}
-            </span>
-          </div>
-        </div>
+        )}
 
-        <div className="px-8 py-6">
-          {/* Addresses + QR */}
-          <div className="grid grid-cols-3 gap-6 mb-8">
-            {/* Emetteur */}
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">De</p>
-              <p className="font-bold text-slate-800">SAGARD SÉCURITÉ SARL</p>
-              <p className="text-sm text-slate-600">Cité Verte, Yopougon</p>
-              <p className="text-sm text-slate-600">Abidjan, Côte d'Ivoire</p>
-              <p className="text-sm text-slate-600 mt-1">+225 2723 434 624</p>
-              <p className="text-sm text-slate-600">sagardsecurite@gmail.com</p>
-              <p className="text-sm text-slate-600">RC : CI-ABJ-2019-B-12345</p>
-            </div>
+        {/* Page content */}
+        <div className="px-12 pt-8 pb-6 flex flex-col" style={{ minHeight: '297mm' }}>
 
-            {/* Client */}
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Facturé à</p>
-              <p className="font-bold text-slate-800">{inv.clientName}</p>
-              <p className="text-sm text-slate-600">{inv.clientAddress}</p>
-              <p className="text-sm text-slate-600">{inv.clientCity}</p>
-            </div>
-
-            {/* QR Code + dates */}
-            <div className="flex flex-col items-end gap-3">
-              <div className="p-2 border-2 border-[#C8D400] rounded-xl bg-white shadow">
-                <QRCodeSVG
-                  value={qrData}
-                  size={100}
-                  bgColor="#ffffff"
-                  fgColor="#1E1E1E"
-                  level="M"
-                />
+          {/* Top header */}
+          <div className="flex items-start justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <img src={logoSagard} alt="SAGARD" className="w-20 h-20 object-contain" />
+              <div>
+                <p className="text-sm font-bold text-slate-800 tracking-wide">SAGARD SECURITE</p>
+                <p className="text-xs italic text-[#C8A000]">Service d'assistance et de gardiennage sécurité</p>
               </div>
-              <div className="text-right text-xs text-slate-500 space-y-0.5">
-                <p><span className="font-semibold">Émission :</span> {fmtDate(inv.issueDate)}</p>
-                <p><span className="font-semibold">Livraison :</span> {fmtDate(inv.deliveryDate)}</p>
-                <p className={inv.status === 'retard' ? 'text-red-600 font-bold' : ''}>
-                  <span className="font-semibold">Échéance :</span> {fmtDate(inv.dueDate)}
-                </p>
-                {inv.paidAt && <p className="text-green-600 font-semibold">Payée le {fmtDate(inv.paidAt)}</p>}
+            </div>
+          </div>
+
+          {/* Client info + Invoice ref */}
+          <div className="flex justify-between items-start mb-6">
+            <div className="text-sm text-slate-700 leading-relaxed">
+              <p className="font-bold">{clientName}</p>
+              {i.client?.neighborhood && <p>{i.client.neighborhood}</p>}
+              {i.client?.district && <p>{i.client.district}</p>}
+              {i.client?.city && <p>{i.client.city}</p>}
+              <p>Côte d'Ivoire</p>
+              {i.client?.rccm && <p>RCCM : {i.client.rccm}</p>}
+              {i.client?.ncc && <p>NCC : {i.client.ncc}</p>}
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-slate-800">{docType} {i.reference}</p>
+            </div>
+          </div>
+
+          {/* Company registration line */}
+          <div className="text-[10px] text-slate-500 mb-4 border-b border-slate-200 pb-2">
+            <p>SAGARD SÉCURITÉ · NCC : 1712198T · RCCM : CI-ABJ-2016-B-24910 · Régime TEE</p>
+            <p>Centre d'impôts : 875 Impôts de Yopougon V</p>
+          </div>
+
+          {/* Date info table */}
+          <div className="border border-slate-300 mb-6">
+            <div className="grid grid-cols-4 text-[11px]">
+              <div className="border-r border-slate-300 p-2">
+                <p className="font-bold text-slate-600">Date de facturation</p>
+                <p className="text-slate-800">{fmtDate(i.issueDate)}</p>
+              </div>
+              <div className="border-r border-slate-300 p-2">
+                <p className="font-bold text-slate-600">Échéance</p>
+                <p className="text-slate-800">{fmtDate(i.dueDate)}</p>
+              </div>
+              <div className="border-r border-slate-300 p-2">
+                <p className="font-bold text-slate-600">RCCM / NCC client</p>
+                <p className="text-slate-800">{i.client?.rccm || i.client?.ncc ? `${i.client.rccm ?? ''} ${i.client.ncc ? '/ ' + i.client.ncc : ''}`.trim() : '—'}</p>
+              </div>
+              <div className="p-2">
+                <p className="font-bold text-slate-600">Mode de paiement</p>
+                <p className="text-slate-800">{i.paymentMethod ?? 'Chèque'}</p>
               </div>
             </div>
           </div>
 
           {/* Lines table */}
-          <div className="rounded-xl overflow-hidden border border-slate-200 mb-6">
-            <table className="w-full text-sm">
+          <div className="mb-6">
+            <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-[#1E1E1E] text-white">
-                  <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide w-16">Code</th>
-                  <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide">Désignation</th>
-                  <th className="text-center px-4 py-3 font-semibold text-xs uppercase tracking-wide w-16">Qté</th>
-                  <th className="text-right px-4 py-3 font-semibold text-xs uppercase tracking-wide w-36">P.U. (XOF)</th>
-                  <th className="text-right px-4 py-3 font-semibold text-xs uppercase tracking-wide w-36">Total (XOF)</th>
+                <tr className="bg-[#C8A000]/20">
+                  <th className="text-left px-3 py-2.5 text-[11px] font-bold text-[#C8A000] uppercase border border-[#C8A000]/30">Description</th>
+                  <th className="text-center px-3 py-2.5 text-[11px] font-bold text-[#C8A000] uppercase border border-[#C8A000]/30 w-24">Quantité</th>
+                  <th className="text-right px-3 py-2.5 text-[11px] font-bold text-[#C8A000] uppercase border border-[#C8A000]/30 w-32">Prix unitaire</th>
+                  <th className="text-right px-3 py-2.5 text-[11px] font-bold text-[#C8A000] uppercase border border-[#C8A000]/30 w-32">Montant</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {inv.lines.map((line, i) => (
-                  <tr key={line.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                    <td className="px-4 py-3 font-mono text-xs font-bold text-slate-500">{line.code}</td>
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-800">{line.description}</p>
-                      {line.details !== line.description && <p className="text-xs text-slate-400">{line.details}</p>}
+              <tbody>
+                {lines.map((line, idx) => (
+                  <tr key={line.id ?? idx}>
+                    <td className="px-3 py-2.5 border border-slate-200 text-slate-800">
+                      {line.code && <span className="font-medium">[{line.code}] </span>}
+                      {line.description}
                     </td>
-                    <td className="px-4 py-3 text-center text-slate-700 font-medium">{line.quantity}</td>
-                    <td className="px-4 py-3 text-right text-slate-700">
-                      {new Intl.NumberFormat('fr-FR').format(line.unitPrice)}
+                    <td className="px-3 py-2.5 border border-slate-200 text-center text-slate-700">
+                      {Number(line.quantity).toFixed(2)} Unité(s)
                     </td>
-                    <td className="px-4 py-3 text-right font-bold text-slate-800">
-                      {new Intl.NumberFormat('fr-FR').format(line.quantity * line.unitPrice)}
+                    <td className="px-3 py-2.5 border border-slate-200 text-right text-slate-700">
+                      {new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2 }).format(Number(line.unitPrice))}
+                    </td>
+                    <td className="px-3 py-2.5 border border-slate-200 text-right font-bold text-slate-800">
+                      {new Intl.NumberFormat('fr-FR').format(Number(line.quantity) * Number(line.unitPrice))} CFA
                     </td>
                   </tr>
                 ))}
@@ -162,71 +158,68 @@ export default function InvoiceDetail() {
             </table>
           </div>
 
-          {/* Totals */}
-          <div className="flex justify-end mb-6">
-            <div className="w-72 space-y-2">
-              <div className="flex justify-between text-sm text-slate-600">
-                <span>Sous-total HT</span>
-                <span className="font-medium">{new Intl.NumberFormat('fr-FR').format(inv.totalAmount)} XOF</span>
+          {/* Total box */}
+          <div className="flex justify-end mb-8">
+            <div className="border-2 border-[#C8A000] inline-flex">
+              <div className="bg-[#C8A000]/10 px-4 py-2 border-r border-[#C8A000]">
+                <span className="text-sm font-bold text-[#C8A000]">Total</span>
               </div>
-              <div className="flex justify-between text-sm text-slate-600">
-                <span>TVA (0%)</span>
-                <span>— XOF</span>
-              </div>
-              <div className="flex justify-between items-center bg-[#1E1E1E] text-white px-4 py-3 rounded-xl">
-                <span className="font-bold text-sm">TOTAL TTC</span>
-                <span className="font-black text-lg text-[#C8D400]">{new Intl.NumberFormat('fr-FR').format(inv.totalAmount)} XOF</span>
+              <div className="px-6 py-2">
+                <span className="text-sm font-black text-slate-800">
+                  {new Intl.NumberFormat('fr-FR').format(totalAmount)} CFA
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Notes */}
-          {inv.notes && (
-            <div className="bg-slate-50 rounded-xl p-4 mb-6 border border-slate-200">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Notes</p>
-              <p className="text-sm text-slate-700">{inv.notes}</p>
+          {/* Payment communication */}
+          <div className="mb-6">
+            <p className="text-sm text-slate-700">
+              <span className="font-bold">Communication de paiement :</span> {i.reference}
+            </p>
+            <p className="text-sm text-slate-700">
+              sur ce compte : <a href={paymentLink} className="text-blue-600 underline">{paymentLink}</a>
+            </p>
+          </div>
+
+          {/* QR Code section */}
+          <div className="flex items-start gap-4 mb-auto">
+            <div className="border border-slate-200 p-1">
+              <QRCodeSVG
+                value={qrData}
+                size={90}
+                bgColor="#ffffff"
+                fgColor="#1E1E1E"
+                level="M"
+              />
             </div>
-          )}
+            <div className="pt-2">
+              <p className="text-sm font-black text-slate-800">PAYEZ EN UN CLIN D'ŒIL !</p>
+              <p className="text-xs italic text-[#C8A000]">Scannez le QR code</p>
+              <p className="text-xs italic text-[#C8A000]">ou cliquez pour payer en ligne</p>
+            </div>
+          </div>
+
+          {/* Spacer to push footer to bottom */}
+          <div className="flex-1" />
 
           {/* Footer */}
-          <div className="border-t border-slate-200 pt-4 flex items-center justify-between text-xs text-slate-400">
-            <div>
-              <p className="font-semibold text-slate-600">Règlement par virement bancaire</p>
-              <p>Banque : NSIA Banque CI · Compte : 12345 67890 00</p>
+          <div className="border-t border-slate-300 pt-3 mt-8">
+            <div className="flex items-center justify-between text-[11px] text-slate-600">
+              <span className="flex items-center gap-1">
+                <Mail size={10} className="text-[#C8A000]" />
+                directionsagardci@gmail.com
+              </span>
+              <span className="flex items-center gap-1">
+                <Phone size={10} className="text-[#C8A000]" />
+                +225 0749 800 080 / 2723266641
+              </span>
+              <span className="flex items-center gap-1">
+                <Globe size={10} className="text-[#C8A000]" />
+                www.sagard.ci
+              </span>
             </div>
-            <div className="text-right">
-              <p>SAGARD SÉCURITÉ SARL — RC: CI-ABJ-2019-B-12345</p>
-              <p>+225 2723 434 624 · sagardsecurite@gmail.com</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Audit history */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm max-w-4xl mx-auto no-print">
-        <div className="px-6 py-4 border-b border-slate-100">
-          <h3 className="font-semibold text-slate-800">Historique de suivi</h3>
-        </div>
-        <div className="px-6 py-4">
-          <div className="relative">
-            <div className="absolute left-3.5 top-0 bottom-0 w-px bg-slate-200" />
-            <div className="space-y-4">
-              {inv.history.map(h => (
-                <div key={h.id} className="flex items-start gap-4 pl-8 relative">
-                  <div className="absolute left-0 top-0.5 w-7 h-7 bg-white border-2 border-slate-200 rounded-full flex items-center justify-center">
-                    <HistoryIcon type={h.type} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-slate-800">{h.action}</p>
-                      <span className="text-xs text-slate-400">— {h.user}</span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-0.5">{h.details}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{fmtDate(h.date)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <p className="text-center text-[10px] text-slate-400 mt-2">Page 1/1</p>
           </div>
         </div>
       </div>

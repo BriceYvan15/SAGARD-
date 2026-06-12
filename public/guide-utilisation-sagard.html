@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guide d'utilisation — SAGARD SÉCURITÉ ERP</title>
+  <style>
+    @page { margin: 15mm 20mm; size: A4; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; line-height: 1.6; background: #fff; }
+    
+    .cover { 
+      min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: white; text-align: center; page-break-after: always;
+    }
+    .cover h1 { font-size: 2.8rem; font-weight: 900; margin-bottom: 0.5rem; }
+    .cover .gold { color: #C8A000; }
+    .cover .subtitle { font-size: 1.2rem; opacity: 0.8; margin-bottom: 2rem; }
+    .cover .version { 
+      background: #C8A000; color: #1a1a2e; padding: 8px 24px; border-radius: 50px;
+      font-weight: 700; font-size: 0.9rem;
+    }
+    .cover .date { margin-top: 1.5rem; opacity: 0.5; font-size: 0.85rem; }
+
+    .page { padding: 20px 0; page-break-after: always; }
+    .page:last-child { page-break-after: auto; }
+
+    h2 { 
+      font-size: 1.5rem; font-weight: 800; color: #0f3460; border-bottom: 3px solid #C8A000;
+      padding-bottom: 8px; margin-bottom: 20px; margin-top: 30px;
+    }
+    h2:first-child { margin-top: 0; }
+    h3 { font-size: 1.1rem; color: #334155; margin: 18px 0 8px; font-weight: 700; }
+
+    .toc { list-style: none; padding: 0; }
+    .toc li { padding: 10px 0; border-bottom: 1px dashed #cbd5e1; display: flex; justify-content: space-between; }
+    .toc li span:first-child { font-weight: 600; }
+    .toc li span:last-child { color: #C8A000; font-weight: 700; }
+
+    .step-container { margin: 15px 0; }
+    .step {
+      display: flex; gap: 15px; margin-bottom: 18px; align-items: flex-start;
+    }
+    .step-num {
+      flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
+      background: #C8A000; color: #1a1a2e; display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 0.95rem;
+    }
+    .step-content { flex: 1; }
+    .step-content strong { color: #0f3460; }
+
+    .info-box {
+      background: #eff6ff; border: 1px solid #bfdbfe; border-left: 4px solid #3b82f6;
+      padding: 12px 16px; border-radius: 8px; margin: 12px 0; font-size: 0.9rem;
+    }
+    .info-box.warning {
+      background: #fffbeb; border-color: #fde68a; border-left-color: #f59e0b;
+    }
+    .info-box.success {
+      background: #f0fdf4; border-color: #bbf7d0; border-left-color: #22c55e;
+    }
+
+    .field-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.85rem; }
+    .field-table th { background: #0f3460; color: white; padding: 8px 12px; text-align: left; font-size: 0.8rem; }
+    .field-table td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; }
+    .field-table tr:nth-child(even) { background: #f8fafc; }
+    .field-table .required { color: #ef4444; font-weight: 700; }
+
+    .nav-path {
+      background: #f1f5f9; border-radius: 8px; padding: 10px 16px; font-family: monospace;
+      font-size: 0.9rem; color: #475569; margin: 8px 0;
+    }
+    .nav-path span { color: #C8A000; font-weight: 700; }
+
+    .workflow {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin: 15px 0; padding: 15px; background: #f8fafc; border-radius: 10px;
+    }
+    .workflow .wf-step {
+      background: white; border: 2px solid #e2e8f0; padding: 8px 14px; border-radius: 8px;
+      font-size: 0.82rem; font-weight: 600; text-align: center;
+    }
+    .workflow .wf-step.active { border-color: #C8A000; background: #fffbeb; }
+    .workflow .wf-arrow { color: #C8A000; font-weight: 900; font-size: 1.2rem; }
+
+    .screenshot-placeholder {
+      background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 12px;
+      padding: 30px; text-align: center; color: #94a3b8; font-size: 0.85rem;
+      margin: 12px 0;
+    }
+
+    .footer {
+      text-align: center; padding: 20px; color: #94a3b8; font-size: 0.75rem;
+      border-top: 1px solid #e2e8f0; margin-top: 30px;
+    }
+
+    ul { padding-left: 20px; margin: 8px 0; }
+    li { margin-bottom: 4px; }
+
+    @media print {
+      body { font-size: 11pt; }
+      .cover { min-height: 270mm; }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════ COUVERTURE ═══════════════════════ -->
+<div class="cover">
+  <div style="font-size: 4rem; margin-bottom: 1rem;">🛡️</div>
+  <h1>SAGARD <span class="gold">SÉCURITÉ</span></h1>
+  <p class="subtitle">Guide d'utilisation de l'ERP</p>
+  <p class="subtitle" style="font-size: 1rem; opacity: 0.6;">Du prospect à l'impression de la facture</p>
+  <span class="version">Version 1.0 — Mai 2026</span>
+  <p class="date">Document confidentiel — Usage interne uniquement</p>
+</div>
+
+<!-- ═══════════════════════ SOMMAIRE ═══════════════════════ -->
+<div class="page">
+  <h2>📋 Sommaire</h2>
+  <ul class="toc">
+    <li><span>1. Connexion au système</span> <span>Page 3</span></li>
+    <li><span>2. Créer un prospect</span> <span>Page 4</span></li>
+    <li><span>3. Faire avancer le prospect dans le pipeline</span> <span>Page 5</span></li>
+    <li><span>4. Convertir un prospect en client</span> <span>Page 6</span></li>
+    <li><span>5. Créer une facture</span> <span>Page 8</span></li>
+    <li><span>6. Consulter et imprimer la facture</span> <span>Page 9</span></li>
+    <li><span>7. Résumé du flux complet</span> <span>Page 10</span></li>
+    <li><span>8. Rôles et permissions</span> <span>Page 11</span></li>
+  </ul>
+
+  <div class="info-box" style="margin-top: 30px;">
+    <strong>ℹ️ À propos de ce guide</strong><br>
+    Ce document décrit le processus complet pour enregistrer un prospect, le convertir en client, créer une facture et l'imprimer. Chaque étape est détaillée avec les champs à remplir et les actions à effectuer.
+  </div>
+</div>
+
+<!-- ═══════════════════════ 1. CONNEXION ═══════════════════════ -->
+<div class="page">
+  <h2>1. Connexion au système</h2>
+  
+  <div class="step-container">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <strong>Ouvrez votre navigateur</strong> et accédez à l'adresse de l'application :
+        <div class="nav-path"><span>http://localhost:5173</span> (développement) ou votre domaine de production</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <strong>Entrez vos identifiants</strong> sur la page de connexion :
+        <table class="field-table">
+          <tr><th>Champ</th><th>Valeur par défaut (DG)</th></tr>
+          <tr><td>Email</td><td><code>dg@sagard.ci</code></td></tr>
+          <tr><td>Mot de passe</td><td><code>sagard2024!</code></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <strong>Cliquez sur « Se connecter »</strong>. Vous serez redirigé vers le tableau de bord.
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box warning">
+    <strong>⚠️ Important</strong><br>
+    Chaque utilisateur a un rôle défini (DG, Commercial, Comptable, etc.) qui détermine ses accès. Contactez l'administrateur pour obtenir vos identifiants.
+  </div>
+</div>
+
+<!-- ═══════════════════════ 2. CRÉER UN PROSPECT ═══════════════════════ -->
+<div class="page">
+  <h2>2. Créer un prospect</h2>
+
+  <p>Un <strong>prospect</strong> (ou lead) représente une opportunité commerciale potentielle.</p>
+
+  <div class="step-container">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <strong>Naviguez vers le module Prospects</strong>
+        <div class="nav-path">Menu latéral → <span>CRM</span> → <span>Prospects</span></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <strong>Cliquez sur « Nouveau prospect »</strong> (bouton bleu en haut à droite)
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <strong>Remplissez le formulaire :</strong>
+        <table class="field-table">
+          <tr><th>Champ</th><th>Obligatoire</th><th>Description</th></tr>
+          <tr><td>Titre / Objet</td><td class="required">Oui</td><td>Ex: « Gardiennage villa Cocody »</td></tr>
+          <tr><td>Entreprise</td><td>Non</td><td>Nom de l'entreprise du prospect</td></tr>
+          <tr><td>Contact</td><td>Non</td><td>Nom du contact principal</td></tr>
+          <tr><td>Téléphone</td><td>Non</td><td>Numéro du contact</td></tr>
+          <tr><td>Email</td><td>Non</td><td>Email du contact</td></tr>
+          <tr><td>Type de service</td><td>Non</td><td>Gardiennage, Patrouille, etc.</td></tr>
+          <tr><td>Source</td><td>Non</td><td>Comment le prospect est arrivé</td></tr>
+          <tr><td>Priorité</td><td>Non</td><td>Basse, Normale, Haute, Urgente</td></tr>
+          <tr><td>Adresse du site</td><td>Non</td><td>Adresse à sécuriser</td></tr>
+          <tr><td>Ville</td><td>Non</td><td>Ville du site</td></tr>
+          <tr><td>Agents estimés</td><td>Non</td><td>Nombre d'agents nécessaires</td></tr>
+          <tr><td>CA estimé (XOF)</td><td>Non</td><td>Revenu mensuel estimé</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <strong>Cliquez sur « Créer le prospect »</strong>. Le prospect apparaît dans le pipeline au stade <strong>Nouveau</strong>.
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box success">
+    <strong>✅ Résultat</strong><br>
+    Un numéro de référence est automatiquement généré (ex: <code>LEAD-00001</code>).
+  </div>
+</div>
+
+<!-- ═══════════════════════ 3. PIPELINE ═══════════════════════ -->
+<div class="page">
+  <h2>3. Faire avancer le prospect dans le pipeline</h2>
+
+  <p>Le prospect passe par plusieurs étapes avant de devenir client :</p>
+
+  <div class="workflow">
+    <div class="wf-step active">Nouveau</div>
+    <div class="wf-arrow">→</div>
+    <div class="wf-step">Qualifié</div>
+    <div class="wf-arrow">→</div>
+    <div class="wf-step">Proposition</div>
+    <div class="wf-arrow">→</div>
+    <div class="wf-step">Négociation</div>
+    <div class="wf-arrow">→</div>
+    <div class="wf-step" style="border-color: #22c55e; background: #f0fdf4;">Gagné ✓</div>
+  </div>
+
+  <h3>Vue Pipeline (Kanban)</h3>
+  <div class="step-container">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <strong>Sur la carte du prospect</strong>, cliquez sur le bouton <strong>« Avancer »</strong> pour le faire passer à l'étape suivante.
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <strong>Transitions disponibles :</strong>
+        <ul>
+          <li><strong>Nouveau → Qualifié</strong> : Le prospect a été contacté et validé</li>
+          <li><strong>Qualifié → Proposition</strong> : Un devis ou une offre a été envoyée</li>
+          <li><strong>Proposition → Négociation</strong> : Le client négocie les termes</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        Si le prospect est <strong>perdu</strong>, cliquez sur le bouton rouge <strong>« Perdu »</strong> à tout moment.
+      </div>
+    </div>
+  </div>
+
+  <h3>Vue Liste</h3>
+  <p>Alternativement, cliquez sur <strong>« Liste »</strong> dans la barre d'outils pour voir tous les prospects sous forme de tableau avec les mêmes boutons d'action.</p>
+
+  <div class="info-box">
+    <strong>ℹ️ Probabilité automatique</strong><br>
+    Chaque étape a une probabilité de conversion : Nouveau (10%) → Qualifié (25%) → Proposition (50%) → Négociation (75%) → Gagné (100%).
+  </div>
+</div>
+
+<!-- ═══════════════════════ 4. CONVERSION ═══════════════════════ -->
+<div class="page">
+  <h2>4. Convertir un prospect en client</h2>
+
+  <p>Lorsque le prospect atteint l'étape <strong>Négociation</strong> et que l'affaire est conclue, vous pouvez le convertir directement en client.</p>
+
+  <div class="step-container">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <strong>Sur le prospect en Négociation</strong>, cliquez sur le bouton vert <strong>« Gagné → Client »</strong>.
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <strong>Le modal de conversion s'ouvre</strong> avec les données du prospect pré-remplies :
+        <table class="field-table">
+          <tr><th>Champ</th><th>Pré-rempli depuis</th><th>Obligatoire</th></tr>
+          <tr><td>Nom de l'entreprise</td><td>companyName du prospect</td><td class="required">Oui</td></tr>
+          <tr><td>Raison sociale</td><td>companyName du prospect</td><td>Non</td></tr>
+          <tr><td>Segment</td><td>—</td><td>Non</td></tr>
+          <tr><td>Secteur d'activité</td><td>—</td><td>Non</td></tr>
+          <tr><td>N° Identification fiscale</td><td>—</td><td>Non</td></tr>
+          <tr><td>N° RCCM</td><td>—</td><td>Non</td></tr>
+          <tr><td>N° NCC</td><td>—</td><td>Non</td></tr>
+          <tr><td>Téléphone</td><td>contactPhone du prospect</td><td>Non</td></tr>
+          <tr><td>Email</td><td>contactEmail du prospect</td><td>Non</td></tr>
+          <tr><td>Adresse</td><td>siteAddress du prospect</td><td class="required">Oui</td></tr>
+          <tr><td>Ville</td><td>siteCity du prospect</td><td class="required">Oui</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <strong>Complétez les informations manquantes</strong> (RCCM, NCC, commune, etc.) puis cliquez sur <strong>« Convertir en client »</strong>.
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <strong>Vous êtes redirigé</strong> vers la page Clients. Le nouveau client est créé avec un code automatique (ex: <code>CLI-00001</code>).
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box success">
+    <strong>✅ Ce qui se passe automatiquement</strong>
+    <ul>
+      <li>Le client est créé dans la base de données avec le statut <strong>ACTIF</strong></li>
+      <li>Le prospect est marqué comme <strong>GAGNÉ</strong> (probabilité 100%)</li>
+      <li>Le prospect est <strong>lié au client</strong> pour la traçabilité</li>
+      <li>Un code client unique est généré automatiquement</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ═══════════════════════ 5. CRÉER UNE FACTURE ═══════════════════════ -->
+<div class="page">
+  <h2>5. Créer une facture</h2>
+
+  <div class="step-container">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <strong>Naviguez vers le module Facturation</strong>
+        <div class="nav-path">Menu latéral → <span>CRM</span> → <span>Facturation</span></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <strong>Cliquez sur « Nouvelle facture »</strong> (bouton doré en haut à droite)
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <strong>Remplissez l'en-tête :</strong>
+        <table class="field-table">
+          <tr><th>Champ</th><th>Obligatoire</th><th>Description</th></tr>
+          <tr><td>Type</td><td class="required">Oui</td><td>Facture, Proforma ou Avoir</td></tr>
+          <tr><td>Client</td><td class="required">Oui</td><td>Sélectionnez dans la liste déroulante</td></tr>
+          <tr><td>Date d'échéance</td><td class="required">Oui</td><td>Date limite de paiement</td></tr>
+          <tr><td>Notes / conditions</td><td>Non</td><td>Conditions de paiement, remarques</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <strong>Ajoutez les lignes de facturation :</strong>
+        <table class="field-table">
+          <tr><th>Champ</th><th>Description</th></tr>
+          <tr><td>Description</td><td>Détail de la prestation (ex: « Gardiennage 24h — Site Cocody »)</td></tr>
+          <tr><td>Quantité</td><td>Nombre d'unités (ex: 30 pour 30 jours)</td></tr>
+          <tr><td>Prix unitaire (XOF)</td><td>Prix par unité</td></tr>
+        </table>
+        <p style="margin-top: 8px;">Cliquez sur <strong>« + Ajouter une ligne »</strong> pour chaque prestation supplémentaire.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <strong>Vérifiez le total</strong> affiché en bas à droite, puis cliquez sur <strong>« Enregistrer »</strong>.
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <strong>ℹ️ Numérotation automatique</strong><br>
+    Le système génère automatiquement un numéro de facture unique (ex: <code>FAC-2026-0001</code>). Aucune TVA n'est appliquée.
+  </div>
+</div>
+
+<!-- ═══════════════════════ 6. IMPRIMER ═══════════════════════ -->
+<div class="page">
+  <h2>6. Consulter et imprimer la facture</h2>
+
+  <div class="step-container">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <strong>Dans la liste des factures</strong>, cliquez sur l'icône <strong>« Voir »</strong> (œil) sur la facture souhaitée.
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <strong>La facture s'affiche</strong> au format professionnel avec :
+        <ul>
+          <li>Logo SAGARD SÉCURITÉ en haut à gauche</li>
+          <li>Coordonnées de l'entreprise (NCC, RCCM, régime fiscal)</li>
+          <li>Informations du client (nom, adresse, RCCM, NCC)</li>
+          <li>Tableau des prestations avec montants</li>
+          <li>Total en CFA</li>
+          <li>QR code de paiement</li>
+          <li>Pied de page avec email, téléphone et site web</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <strong>Cliquez sur « Imprimer / PDF »</strong> (bouton doré en haut à droite).
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <strong>Dans la boîte de dialogue d'impression :</strong>
+        <ul>
+          <li>Pour <strong>imprimer</strong> : sélectionnez votre imprimante</li>
+          <li>Pour <strong>sauvegarder en PDF</strong> : sélectionnez <strong>« Microsoft Print to PDF »</strong> ou <strong>« Enregistrer au format PDF »</strong></li>
+          <li>Cliquez sur <strong>« Imprimer »</strong> ou <strong>« Enregistrer »</strong></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box success">
+    <strong>✅ Rendu professionnel</strong><br>
+    Seule la facture est imprimée — le menu latéral et l'en-tête de l'application sont automatiquement masqués. Les couleurs du ruban de statut (Payée/En attente) sont préservées à l'impression.
+  </div>
+</div>
+
+<!-- ═══════════════════════ 7. RÉSUMÉ ═══════════════════════ -->
+<div class="page">
+  <h2>7. Résumé du flux complet</h2>
+
+  <div class="workflow" style="flex-direction: column; align-items: stretch; gap: 0;">
+    <div style="display: flex; align-items: center; padding: 12px; background: #eff6ff; border-radius: 8px 8px 0 0;">
+      <div style="width: 30px; height: 30px; border-radius: 50%; background: #3b82f6; color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.8rem; margin-right: 12px;">1</div>
+      <div><strong>Créer le prospect</strong> — CRM → Prospects → Nouveau prospect</div>
+    </div>
+    <div style="text-align: center; padding: 4px; color: #C8A000; font-size: 1.2rem;">▼</div>
+    <div style="display: flex; align-items: center; padding: 12px; background: #eef2ff;">
+      <div style="width: 30px; height: 30px; border-radius: 50%; background: #6366f1; color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.8rem; margin-right: 12px;">2</div>
+      <div><strong>Qualifier</strong> — Bouton « Avancer » sur le prospect</div>
+    </div>
+    <div style="text-align: center; padding: 4px; color: #C8A000; font-size: 1.2rem;">▼</div>
+    <div style="display: flex; align-items: center; padding: 12px; background: #faf5ff;">
+      <div style="width: 30px; height: 30px; border-radius: 50%; background: #a855f7; color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.8rem; margin-right: 12px;">3</div>
+      <div><strong>Envoyer proposition</strong> — Bouton « Avancer »</div>
+    </div>
+    <div style="text-align: center; padding: 4px; color: #C8A000; font-size: 1.2rem;">▼</div>
+    <div style="display: flex; align-items: center; padding: 12px; background: #fffbeb;">
+      <div style="width: 30px; height: 30px; border-radius: 50%; background: #f59e0b; color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.8rem; margin-right: 12px;">4</div>
+      <div><strong>Négocier</strong> — Bouton « Avancer »</div>
+    </div>
+    <div style="text-align: center; padding: 4px; color: #C8A000; font-size: 1.2rem;">▼</div>
+    <div style="display: flex; align-items: center; padding: 12px; background: #f0fdf4;">
+      <div style="width: 30px; height: 30px; border-radius: 50%; background: #22c55e; color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.8rem; margin-right: 12px;">5</div>
+      <div><strong>Gagné → Convertir en client</strong> — Remplir les données complémentaires</div>
+    </div>
+    <div style="text-align: center; padding: 4px; color: #C8A000; font-size: 1.2rem;">▼</div>
+    <div style="display: flex; align-items: center; padding: 12px; background: #fffbeb;">
+      <div style="width: 30px; height: 30px; border-radius: 50%; background: #C8A000; color: #1a1a2e; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.8rem; margin-right: 12px;">6</div>
+      <div><strong>Créer la facture</strong> — CRM → Facturation → Nouvelle facture</div>
+    </div>
+    <div style="text-align: center; padding: 4px; color: #C8A000; font-size: 1.2rem;">▼</div>
+    <div style="display: flex; align-items: center; padding: 12px; background: #f0fdf4; border-radius: 0 0 8px 8px;">
+      <div style="width: 30px; height: 30px; border-radius: 50%; background: #0f3460; color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.8rem; margin-right: 12px;">7</div>
+      <div><strong>Imprimer / PDF</strong> — Bouton « Imprimer / PDF » sur la facture</div>
+    </div>
+  </div>
+
+  <div class="info-box warning">
+    <strong>⚠️ Rappel important</strong><br>
+    <ul>
+      <li>Les <strong>commerciaux</strong> créent les prospects et les font avancer</li>
+      <li>La <strong>facture définitive</strong> sera à terme émise uniquement par le comptable</li>
+      <li>Aucune TVA n'est appliquée dans le système</li>
+      <li>Les numéros RCCM et NCC du client apparaissent sur la facture</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ═══════════════════════ 8. RÔLES ═══════════════════════ -->
+<div class="page">
+  <h2>8. Rôles et permissions</h2>
+
+  <table class="field-table">
+    <tr>
+      <th>Rôle</th>
+      <th>Accès CRM</th>
+      <th>Création factures</th>
+      <th>Accès Opérations</th>
+    </tr>
+    <tr>
+      <td><strong>Directeur Général (DG)</strong></td>
+      <td>✅ Complet</td>
+      <td>✅ Oui</td>
+      <td>✅ Complet</td>
+    </tr>
+    <tr>
+      <td><strong>Commercial</strong></td>
+      <td>✅ Prospects, Clients</td>
+      <td>⚠️ Devis & Proforma uniquement</td>
+      <td>❌ Non</td>
+    </tr>
+    <tr>
+      <td><strong>Comptable</strong></td>
+      <td>✅ Clients, Factures</td>
+      <td>✅ Factures définitives</td>
+      <td>❌ Non</td>
+    </tr>
+    <tr>
+      <td><strong>Chef Opérations</strong></td>
+      <td>👀 Consultation</td>
+      <td>❌ Non</td>
+      <td>✅ Complet</td>
+    </tr>
+    <tr>
+      <td><strong>RH</strong></td>
+      <td>❌ Non</td>
+      <td>❌ Non</td>
+      <td>👀 Consultation agents</td>
+    </tr>
+  </table>
+
+  <div class="info-box" style="margin-top: 30px;">
+    <strong>ℹ️ Contact support</strong><br>
+    Pour toute question technique, contactez l'équipe de développement.<br>
+    Email : <strong>directionsagardci@gmail.com</strong><br>
+    Téléphone : <strong>+225 0749 800 080</strong>
+  </div>
+
+  <div class="footer">
+    <p>© 2026 SAGARD SÉCURITÉ — Tous droits réservés</p>
+    <p>NCC : 1712198T · RCCM : CI-ABJ-2016-B-24910 · Régime TEE</p>
+    <p>www.sagard.ci</p>
+  </div>
+</div>
+
+</body>
+</html>

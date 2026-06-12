@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flux Commercial — SAGARD SÉCURITÉ</title>
+  <style>
+    @page { margin: 15mm 20mm; size: A4; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; line-height: 1.65; background: #fff; }
+
+    .cover {
+      min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: white; text-align: center; page-break-after: always;
+    }
+    .cover h1 { font-size: 2.6rem; font-weight: 900; margin-bottom: 0.3rem; }
+    .cover .gold { color: #C8A000; }
+    .cover .subtitle { font-size: 1.1rem; opacity: 0.75; margin-bottom: 0.5rem; }
+    .cover .desc { font-size: 0.95rem; opacity: 0.5; max-width: 460px; margin: 0 auto 2rem; }
+    .cover .version { background: #C8A000; color: #1a1a2e; padding: 8px 28px; border-radius: 50px; font-weight: 700; font-size: 0.85rem; }
+    .cover .date { margin-top: 1.5rem; opacity: 0.4; font-size: 0.8rem; }
+
+    .page { padding: 10px 0; page-break-after: always; }
+    .page:last-child { page-break-after: auto; }
+
+    h2 { font-size: 1.4rem; font-weight: 800; color: #0f3460; border-bottom: 3px solid #C8A000; padding-bottom: 8px; margin-bottom: 18px; margin-top: 25px; }
+    h2:first-child { margin-top: 0; }
+    h3 { font-size: 1.05rem; color: #334155; margin: 16px 0 6px; font-weight: 700; }
+
+    .toc { list-style: none; padding: 0; }
+    .toc li { padding: 9px 0; border-bottom: 1px dashed #cbd5e1; display: flex; justify-content: space-between; }
+    .toc li span:first-child { font-weight: 600; }
+    .toc li span:last-child { color: #C8A000; font-weight: 700; }
+
+    .step { display: flex; gap: 14px; margin-bottom: 16px; align-items: flex-start; }
+    .step-num { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; background: #C8A000; color: #1a1a2e; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.9rem; }
+    .step-content { flex: 1; }
+    .step-content strong { color: #0f3460; }
+
+    .info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-left: 4px solid #3b82f6; padding: 11px 15px; border-radius: 8px; margin: 10px 0; font-size: 0.88rem; }
+    .info-box.warn { background: #fffbeb; border-color: #fde68a; border-left-color: #f59e0b; }
+    .info-box.ok { background: #f0fdf4; border-color: #bbf7d0; border-left-color: #22c55e; }
+    .info-box.purple { background: #faf5ff; border-color: #e9d5ff; border-left-color: #a855f7; }
+
+    .field-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 0.82rem; }
+    .field-table th { background: #0f3460; color: white; padding: 7px 11px; text-align: left; font-size: 0.78rem; }
+    .field-table td { padding: 7px 11px; border-bottom: 1px solid #e2e8f0; }
+    .field-table tr:nth-child(even) { background: #f8fafc; }
+    .field-table .req { color: #ef4444; font-weight: 700; }
+
+    .nav-path { background: #f1f5f9; border-radius: 8px; padding: 9px 15px; font-family: monospace; font-size: 0.88rem; color: #475569; margin: 7px 0; }
+    .nav-path span { color: #C8A000; font-weight: 700; }
+
+    /* big flow diagram */
+    .flow-v { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 20px auto; max-width: 520px; }
+    .flow-card { width: 100%; display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 10px; border: 2px solid #e2e8f0; background: white; }
+    .flow-card .fc-num { flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.85rem; color: white; }
+    .flow-card .fc-body { flex: 1; }
+    .flow-card .fc-title { font-weight: 700; font-size: 0.95rem; }
+    .flow-card .fc-sub { font-size: 0.78rem; color: #64748b; margin-top: 2px; }
+    .flow-arrow { font-size: 1.4rem; color: #C8A000; font-weight: 900; line-height: 1; padding: 4px 0; }
+
+    .sidebar-demo { background: #1a1a2e; border-radius: 14px; padding: 18px 16px; max-width: 240px; margin: 12px 0; }
+    .sidebar-demo .sd-title { font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: #64748b; margin-bottom: 6px; padding-left: 4px; }
+    .sidebar-demo .sd-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; font-size: 0.78rem; font-weight: 600; color: #94a3b8; margin-bottom: 2px; }
+    .sidebar-demo .sd-item.active { background: #C8A000; color: #1a1a2e; }
+
+    ul { padding-left: 18px; margin: 6px 0; }
+    li { margin-bottom: 3px; font-size: 0.9rem; }
+
+    .footer { text-align: center; padding: 18px; color: #94a3b8; font-size: 0.72rem; border-top: 1px solid #e2e8f0; margin-top: 25px; }
+
+    @media print { body { font-size: 10.5pt; } .cover { min-height: 270mm; } }
+  </style>
+</head>
+<body>
+
+<!-- ══════════ COUVERTURE ══════════ -->
+<div class="cover">
+  <div style="font-size: 3.5rem; margin-bottom: 1rem;">🛡️</div>
+  <h1>SAGARD <span class="gold">SÉCURITÉ</span></h1>
+  <p class="subtitle">Guide du Flux Commercial Complet</p>
+  <p class="desc">Du prospect à la facture définitive — Description détaillée de chaque étape avec la nouvelle organisation de l'application</p>
+  <span class="version">Version 2.0 — Mai 2026</span>
+  <p class="date">Document confidentiel — Usage interne uniquement</p>
+</div>
+
+<!-- ══════════ SOMMAIRE ══════════ -->
+<div class="page">
+  <h2>📋 Sommaire</h2>
+  <ul class="toc">
+    <li><span>1. Le flux commercial en un coup d'œil</span> <span>p. 3</span></li>
+    <li><span>2. Nouvelle organisation du menu</span> <span>p. 4</span></li>
+    <li><span>3. Étape 1 — Créer un prospect</span> <span>p. 5</span></li>
+    <li><span>4. Étape 2 — Créer un devis</span> <span>p. 6</span></li>
+    <li><span>5. Étape 3 — Créer une facture proforma</span> <span>p. 7</span></li>
+    <li><span>6. Étape 4 — Convertir le prospect en client</span> <span>p. 8</span></li>
+    <li><span>7. Étape 5 — Créer le contrat</span> <span>p. 9</span></li>
+    <li><span>8. Étape 6 — Émettre la facture définitive</span> <span>p. 10</span></li>
+    <li><span>9. Étape 7 — Imprimer / Exporter en PDF</span> <span>p. 11</span></li>
+    <li><span>10. Rôles et responsabilités</span> <span>p. 12</span></li>
+  </ul>
+
+  <div class="info-box" style="margin-top: 25px;">
+    <strong>ℹ️ À propos</strong><br>
+    Ce guide décrit le flux commercial complet tel qu'il fonctionne dans l'ERP SAGARD SÉCURITÉ, depuis l'enregistrement d'un prospect jusqu'à l'impression de la facture définitive.
+  </div>
+</div>
+
+<!-- ══════════ 1. VUE D'ENSEMBLE ══════════ -->
+<div class="page">
+  <h2>1. Le flux commercial en un coup d'œil</h2>
+
+  <div class="flow-v">
+    <div class="flow-card" style="border-color: #6366f1;">
+      <div class="fc-num" style="background: #6366f1;">1</div>
+      <div class="fc-body">
+        <div class="fc-title">Prospect</div>
+        <div class="fc-sub">Enregistrer l'opportunité commerciale avec les informations du contact</div>
+      </div>
+    </div>
+    <div class="flow-arrow">▼</div>
+
+    <div class="flow-card" style="border-color: #3b82f6;">
+      <div class="fc-num" style="background: #3b82f6;">2</div>
+      <div class="fc-body">
+        <div class="fc-title">Devis</div>
+        <div class="fc-sub">Créer un devis détaillé basé sur la demande du prospect</div>
+      </div>
+    </div>
+    <div class="flow-arrow">▼</div>
+
+    <div class="flow-card" style="border-color: #a855f7;">
+      <div class="fc-num" style="background: #a855f7;">3</div>
+      <div class="fc-body">
+        <div class="fc-title">Facture Proforma</div>
+        <div class="fc-sub">Envoyer la facture proforma au prospect pour signature</div>
+      </div>
+    </div>
+    <div class="flow-arrow">▼</div>
+
+    <div class="flow-card" style="border-color: #22c55e; background: #f0fdf4;">
+      <div class="fc-num" style="background: #22c55e;">✓</div>
+      <div class="fc-body">
+        <div class="fc-title" style="color: #16a34a;">Signature du prospect → Conversion en Client</div>
+        <div class="fc-sub">Le prospect signe la proforma → il est converti en client avec RCCM et NCC</div>
+      </div>
+    </div>
+    <div class="flow-arrow">▼</div>
+
+    <div class="flow-card" style="border-color: #f59e0b;">
+      <div class="fc-num" style="background: #f59e0b;">4</div>
+      <div class="fc-body">
+        <div class="fc-title">Contrat</div>
+        <div class="fc-sub">Créer et envoyer le contrat de prestation au nouveau client</div>
+      </div>
+    </div>
+    <div class="flow-arrow">▼</div>
+
+    <div class="flow-card" style="border-color: #C8A000; background: #fffbeb;">
+      <div class="fc-num" style="background: #C8A000; color: #1a1a2e;">5</div>
+      <div class="fc-body">
+        <div class="fc-title">Facture Définitive</div>
+        <div class="fc-sub">Émettre la facture définitive (par le comptable) et l'envoyer au client</div>
+      </div>
+    </div>
+    <div class="flow-arrow">▼</div>
+
+    <div class="flow-card" style="border-color: #0f3460; background: #eff6ff;">
+      <div class="fc-num" style="background: #0f3460;">6</div>
+      <div class="fc-body">
+        <div class="fc-title">Impression / PDF</div>
+        <div class="fc-sub">Imprimer ou exporter la facture au format PDF professionnel</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box warn">
+    <strong>⚠️ Règle importante</strong><br>
+    Aucune TVA n'est appliquée dans le système SAGARD. Tous les montants sont nets.
+  </div>
+</div>
+
+<!-- ══════════ 2. NOUVEAU MENU ══════════ -->
+<div class="page">
+  <h2>2. Nouvelle organisation du menu</h2>
+
+  <p>L'application est maintenant organisée par <strong>sections logiques</strong> dans le menu latéral :</p>
+
+  <div style="display: flex; gap: 30px; margin-top: 15px;">
+    <div class="sidebar-demo">
+      <div class="sd-item active">📊 Tableau de bord</div>
+
+      <div class="sd-title" style="margin-top: 12px;">Gestion Commerciale</div>
+      <div class="sd-item">🎯 Prospects</div>
+      <div class="sd-item">📋 Devis</div>
+      <div class="sd-item">📄 Factures Proforma</div>
+      <div class="sd-item">💼 Contrats</div>
+      <div class="sd-item">🧾 Factures</div>
+      <div class="sd-item">👥 Clients</div>
+
+      <div class="sd-title" style="margin-top: 12px;">Opérations</div>
+      <div class="sd-item">📍 Sites gardiennés</div>
+      <div class="sd-item">👮 Agents</div>
+      <div class="sd-item">⚡ Opérations</div>
+      <div class="sd-item">🔔 Supervision</div>
+      <div class="sd-item">📝 Registres site</div>
+
+      <div class="sd-title" style="margin-top: 12px;">Administration</div>
+      <div class="sd-item">👥 Ressources Humaines</div>
+      <div class="sd-item">📦 Stock & Véhicules</div>
+      <div class="sd-item">🤖 Assistant IA</div>
+    </div>
+
+    <div style="flex: 1;">
+      <h3>Gestion Commerciale</h3>
+      <p style="font-size: 0.88rem;">Regroupe tout le parcours client :</p>
+      <table class="field-table">
+        <tr><th>Page</th><th>Rôle dans le flux</th></tr>
+        <tr><td><strong>Prospects</strong></td><td>Pipeline des opportunités (Nouveau → Qualifié → Proposition → Négociation → Gagné)</td></tr>
+        <tr><td><strong>Devis</strong></td><td>Création et suivi des devis envoyés aux prospects</td></tr>
+        <tr><td><strong>Factures Proforma</strong></td><td>Factures proforma envoyées pour signature</td></tr>
+        <tr><td><strong>Contrats</strong></td><td>Contrats de prestation (Brouillon → Devis → Proforma → Confirmé → Actif)</td></tr>
+        <tr><td><strong>Factures</strong></td><td>Factures définitives uniquement (émises par le comptable)</td></tr>
+        <tr><td><strong>Clients</strong></td><td>Base clients avec RCCM, NCC, contacts</td></tr>
+      </table>
+
+      <h3>Opérations</h3>
+      <p style="font-size: 0.88rem;">Gestion quotidienne du dispositif de sécurité.</p>
+
+      <h3>Administration</h3>
+      <p style="font-size: 0.88rem;">RH, stock, véhicules et assistant IA.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 3. PROSPECT ══════════ -->
+<div class="page">
+  <h2>3. Étape 1 — Créer un prospect</h2>
+
+  <p>Le prospect est la <strong>première étape</strong>. Il représente une opportunité commerciale potentielle.</p>
+
+  <div class="nav-path">Menu → <span>Gestion Commerciale</span> → <span>Prospects</span> → bouton <span>« Nouveau prospect »</span></div>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <strong>Remplissez le formulaire :</strong>
+      <table class="field-table">
+        <tr><th>Champ</th><th>Obligatoire</th><th>Exemple</th></tr>
+        <tr><td>Titre / Objet</td><td class="req">Oui</td><td>Gardiennage siège BCEAO Plateau</td></tr>
+        <tr><td>Entreprise</td><td>Non</td><td>BCEAO</td></tr>
+        <tr><td>Contact</td><td>Non</td><td>M. Kouadio Jean</td></tr>
+        <tr><td>Téléphone</td><td>Non</td><td>+225 07 00 00 00</td></tr>
+        <tr><td>Email</td><td>Non</td><td>kouadio@bceao.int</td></tr>
+        <tr><td>Type de service</td><td>Non</td><td>Gardiennage</td></tr>
+        <tr><td>Adresse du site</td><td>Non</td><td>Bd Botreau Roussel, Plateau</td></tr>
+        <tr><td>Ville</td><td>Non</td><td>Abidjan</td></tr>
+        <tr><td>CA estimé</td><td>Non</td><td>2 500 000 XOF</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <strong>Le prospect apparaît dans le pipeline</strong> au stade « Nouveau ». Faites-le avancer dans les étapes avec le bouton « Avancer » :
+      <ul>
+        <li><strong>Nouveau</strong> → Contact initial établi</li>
+        <li><strong>Qualifié</strong> → Besoin validé, budget confirmé</li>
+        <li><strong>Proposition</strong> → Devis envoyé (voir étape suivante)</li>
+        <li><strong>Négociation</strong> → Proforma envoyée, en attente de signature</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="info-box ok">
+    <strong>✅ Résultat</strong> — Un numéro de référence est généré automatiquement (ex: <code>LEAD-00001</code>).
+  </div>
+</div>
+
+<!-- ══════════ 4. DEVIS ══════════ -->
+<div class="page">
+  <h2>4. Étape 2 — Créer un devis</h2>
+
+  <p>Pendant que le prospect est dans le pipeline, vous lui créez un <strong>devis</strong> basé sur sa demande.</p>
+
+  <div class="nav-path">Menu → <span>Gestion Commerciale</span> → <span>Devis</span> → bouton <span>« Nouveau devis »</span></div>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <strong>Sélectionnez le prospect</strong> dans la liste déroulante. Les données seront liées à son dossier.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <strong>Définissez la date de validité</strong> du devis (ex: 30 jours après émission).
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <strong>Ajoutez les lignes de prestation :</strong>
+      <table class="field-table">
+        <tr><th>Description</th><th>Quantité</th><th>Prix unitaire</th><th>Total ligne</th></tr>
+        <tr><td>Gardiennage 24h/24 — 3 agents</td><td>3</td><td>350 000</td><td>1 050 000 XOF</td></tr>
+        <tr><td>Patrouille mobile nuit</td><td>1</td><td>200 000</td><td>200 000 XOF</td></tr>
+        <tr><td>Installation poste de garde</td><td>1</td><td>150 000</td><td>150 000 XOF</td></tr>
+        <tr><td colspan="3" style="text-align: right; font-weight: 800;">TOTAL</td><td style="font-weight: 900;">1 400 000 XOF</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <strong>Cliquez « Créer le devis »</strong>. Un numéro est généré automatiquement.<br>
+      Envoyez le devis au prospect par email ou en version imprimée.
+    </div>
+  </div>
+
+  <div class="info-box">
+    <strong>ℹ️ Astuce</strong> — Vous pouvez voir le devis au format facture en cliquant sur l'icône œil, puis l'imprimer/PDF.
+  </div>
+</div>
+
+<!-- ══════════ 5. PROFORMA ══════════ -->
+<div class="page">
+  <h2>5. Étape 3 — Créer une facture proforma</h2>
+
+  <p>Si le prospect accepte le devis, vous lui envoyez une <strong>facture proforma</strong> pour signature officielle.</p>
+
+  <div class="nav-path">Menu → <span>Gestion Commerciale</span> → <span>Factures Proforma</span> → bouton <span>« Nouvelle proforma »</span></div>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <strong>Sélectionnez le même prospect</strong> que pour le devis.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <strong>Reprenez les mêmes lignes</strong> que le devis (éventuellement ajustées après négociation).
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <strong>Cliquez « Créer la proforma »</strong>, puis imprimez et envoyez au prospect pour signature.
+    </div>
+  </div>
+
+  <div class="info-box purple">
+    <strong>💜 Moment clé</strong><br>
+    La facture proforma est le document que le prospect doit <strong>signer pour valider la collaboration</strong>. C'est la frontière entre prospect et client.
+  </div>
+
+  <div class="info-box ok" style="margin-top: 10px;">
+    <strong>✅ Une fois signée :</strong>
+    <ul>
+      <li>Le prospect est prêt à être converti en client</li>
+      <li>Le contrat de prestation sera créé</li>
+      <li>La facture définitive sera émise</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ══════════ 6. CONVERSION ══════════ -->
+<div class="page">
+  <h2>6. Étape 4 — Convertir le prospect en client</h2>
+
+  <p>Lorsque la proforma est signée, retournez dans <strong>Prospects</strong> et convertissez le prospect en client.</p>
+
+  <div class="nav-path">Menu → <span>Gestion Commerciale</span> → <span>Prospects</span> → bouton vert <span>« Gagné → Client »</span></div>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <strong>Cliquez « Gagné → Client »</strong> sur le prospect en étape Négociation. Le modal de conversion s'ouvre.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <strong>Les données sont pré-remplies</strong> depuis le prospect. Complétez les champs manquants :
+      <table class="field-table">
+        <tr><th>Champ</th><th>Pré-rempli</th><th>À compléter</th></tr>
+        <tr><td>Nom entreprise</td><td>✅ Oui</td><td></td></tr>
+        <tr><td>Téléphone / Email</td><td>✅ Oui</td><td></td></tr>
+        <tr><td>Adresse / Ville</td><td>✅ Oui</td><td></td></tr>
+        <tr><td>Segment</td><td></td><td>🔶 Choisir le type (Entreprise privée, ONG, etc.)</td></tr>
+        <tr><td><strong>N° RCCM</strong></td><td></td><td>🔶 Registre du Commerce</td></tr>
+        <tr><td><strong>N° NCC</strong></td><td></td><td>🔶 Numéro Compte Contribuable</td></tr>
+        <tr><td>Secteur d'activité</td><td></td><td>🔶 Ex: Banque, BTP, etc.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <strong>Cliquez « Convertir en client »</strong>. Le système :
+      <ul>
+        <li>Crée le client avec un code unique (ex: <code>CLI-00001</code>)</li>
+        <li>Marque le prospect comme <strong>GAGNÉ</strong></li>
+        <li>Lie le prospect au client pour la traçabilité</li>
+        <li>Vous redirige vers la page <strong>Clients</strong></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 7. CONTRAT ══════════ -->
+<div class="page">
+  <h2>7. Étape 5 — Créer le contrat</h2>
+
+  <p>Le client étant créé, il faut maintenant formaliser la prestation avec un <strong>contrat</strong>.</p>
+
+  <div class="nav-path">Menu → <span>Gestion Commerciale</span> → <span>Contrats</span> → bouton <span>« Nouveau contrat »</span></div>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <strong>Onglet Identification :</strong> Intitulé, client, type de prestation, dates de début/fin.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <strong>Onglet Site & Affectation :</strong> Sélectionnez le site couvert et le chargé d'affaires.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <strong>Onglet Effectif :</strong> Nombre d'agents, nombre de vacations (1, 2 ou 3 = 24h/24h).
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <strong>Onglet Financier :</strong> Montant mensuel, frais de mise en place, fréquence de facturation, délai de paiement.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-content">
+      <strong>Onglet Conditions :</strong> Clauses particulières du contrat.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-content">
+      <strong>Le contrat est créé en BROUILLON</strong>. Faites-le passer par les étapes :
+      <ul>
+        <li>Brouillon → <strong>Confirmer</strong></li>
+        <li>Confirmé → <strong>Activer</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <strong>ℹ️ Référence</strong> — Un numéro unique est généré (ex: <code>CTR-2026-0001</code>).
+  </div>
+</div>
+
+<!-- ══════════ 8. FACTURE DÉFINITIVE ══════════ -->
+<div class="page">
+  <h2>8. Étape 6 — Émettre la facture définitive</h2>
+
+  <p>La facture définitive est émise <strong>par le comptable</strong> une fois le contrat actif.</p>
+
+  <div class="nav-path">Menu → <span>Gestion Commerciale</span> → <span>Factures</span> → bouton <span>« Nouvelle facture »</span></div>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <strong>Sélectionnez le client</strong> dans la liste (celui créé à l'étape 4).
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <strong>Définissez la date d'échéance</strong> de paiement.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <strong>Ajoutez les lignes de facturation</strong> correspondant aux prestations du contrat.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <strong>Cliquez « Créer la facture »</strong>. Vous êtes redirigé vers le détail de la facture.
+    </div>
+  </div>
+
+  <div class="info-box ok">
+    <strong>✅ La facture contient :</strong>
+    <ul>
+      <li>Logo SAGARD SÉCURITÉ</li>
+      <li>NCC et RCCM de SAGARD (pied de page)</li>
+      <li>RCCM et NCC du client</li>
+      <li>Tableau des prestations</li>
+      <li>Total en CFA (sans TVA)</li>
+      <li>QR code de paiement</li>
+    </ul>
+  </div>
+
+  <div class="info-box warn">
+    <strong>⚠️ Rappel</strong> — Seul le <strong>comptable</strong> émet la facture définitive. Les commerciaux créent uniquement les devis et les factures proforma.
+  </div>
+</div>
+
+<!-- ══════════ 9. IMPRESSION ══════════ -->
+<div class="page">
+  <h2>9. Étape 7 — Imprimer / Exporter en PDF</h2>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <strong>Sur la page de la facture</strong>, cliquez sur le bouton doré <strong>« Imprimer / PDF »</strong> en haut à droite.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <strong>Dans la boîte de dialogue du navigateur :</strong>
+      <ul>
+        <li>Pour <strong>imprimer</strong> → sélectionnez votre imprimante</li>
+        <li>Pour <strong>sauvegarder en PDF</strong> → sélectionnez « <strong>Microsoft Print to PDF</strong> » ou « <strong>Enregistrer au format PDF</strong> »</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <strong>Cliquez « Imprimer » ou « Enregistrer »</strong>. Le rendu est professionnel :
+      <ul>
+        <li>Le menu latéral et l'en-tête sont masqués automatiquement</li>
+        <li>Seule la facture est imprimée</li>
+        <li>Le ruban de statut (Payée / En attente) conserve ses couleurs</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <strong>ℹ️ Astuce</strong> — Cette même fonctionnalité fonctionne aussi pour les devis et les factures proforma. Cliquez sur l'icône œil (👁) dans la liste, puis « Imprimer / PDF ».
+  </div>
+</div>
+
+<!-- ══════════ 10. RÔLES ══════════ -->
+<div class="page">
+  <h2>10. Rôles et responsabilités</h2>
+
+  <table class="field-table">
+    <tr>
+      <th>Étape</th>
+      <th>Qui ?</th>
+      <th>Action</th>
+    </tr>
+    <tr>
+      <td><strong>1. Prospect</strong></td>
+      <td>Commercial</td>
+      <td>Enregistre et fait avancer dans le pipeline</td>
+    </tr>
+    <tr>
+      <td><strong>2. Devis</strong></td>
+      <td>Commercial</td>
+      <td>Crée le devis et l'envoie au prospect</td>
+    </tr>
+    <tr>
+      <td><strong>3. Proforma</strong></td>
+      <td>Commercial</td>
+      <td>Crée la proforma et l'envoie pour signature</td>
+    </tr>
+    <tr>
+      <td><strong>4. Conversion</strong></td>
+      <td>Commercial / DG</td>
+      <td>Convertit le prospect en client après signature</td>
+    </tr>
+    <tr>
+      <td><strong>5. Contrat</strong></td>
+      <td>Commercial / DG</td>
+      <td>Crée et fait valider le contrat de prestation</td>
+    </tr>
+    <tr>
+      <td><strong>6. Facture définitive</strong></td>
+      <td><strong>Comptable</strong></td>
+      <td>Émet la facture définitive uniquement</td>
+    </tr>
+    <tr>
+      <td><strong>7. Impression</strong></td>
+      <td>Tous</td>
+      <td>Imprime ou exporte en PDF</td>
+    </tr>
+  </table>
+
+  <h3 style="margin-top: 25px;">Résumé des permissions</h3>
+  <table class="field-table">
+    <tr>
+      <th>Rôle</th>
+      <th>Prospects</th>
+      <th>Devis</th>
+      <th>Proforma</th>
+      <th>Contrats</th>
+      <th>Factures déf.</th>
+    </tr>
+    <tr>
+      <td><strong>DG</strong></td>
+      <td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td>
+    </tr>
+    <tr>
+      <td><strong>Commercial</strong></td>
+      <td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td>
+    </tr>
+    <tr>
+      <td><strong>Comptable</strong></td>
+      <td>👀</td><td>👀</td><td>👀</td><td>👀</td><td>✅</td>
+    </tr>
+    <tr>
+      <td><strong>Chef Opérations</strong></td>
+      <td>❌</td><td>❌</td><td>❌</td><td>👀</td><td>❌</td>
+    </tr>
+  </table>
+
+  <div class="footer" style="margin-top: 40px;">
+    <p><strong>© 2026 SAGARD SÉCURITÉ</strong> — Tous droits réservés</p>
+    <p>NCC : 1712198T · RCCM : CI-ABJ-2016-B-24910 · Régime TEE</p>
+    <p>directionsagardci@gmail.com · +225 0749 800 080 · www.sagard.ci</p>
+  </div>
+</div>
+
+</body>
+</html>
