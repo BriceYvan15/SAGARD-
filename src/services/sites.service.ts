@@ -20,6 +20,16 @@ export const addPatrolPoint = (siteId: string, body: any) =>
 export const disablePatrolPoint = (pointId: string) =>
   api.patch(`/sites/patrol-points/${pointId}/disable`).then(r => r.data)
 
+// Badge QR de marque (SVG) — « Badge sombre premium »
+export const getPatrolPointQr = (pointId: string) =>
+  api.get(`/sites/patrol-points/${pointId}/qr`).then(r => r.data as {
+    pointId: string; code: string; name: string; siteName: string | null; sequence: number; svg: string
+  })
+export const getPatrolPointsQrSheet = (siteId: string) =>
+  api.get(`/sites/${siteId}/patrol-points/qr-sheet`).then(r => r.data as {
+    siteId: string; siteName: string; count: number; svg: string
+  })
+
 // Pointages du jour pour un site
 export const getSiteTodayPointages = (siteId: string) =>
   api.get(`/sites/${siteId}/pointages/today`).then(r => r.data)

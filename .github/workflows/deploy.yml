@@ -1,0 +1,50 @@
+name: Deploy Frontend
+
+# Déploiement automatique du frontend SAGARD sur le VPS.
+# Se déclenche à chaque push sur `main` (donc après merge d'une PR) ou manuellement.
+# Un seul déploiement à la fois (concurrency) → deux merges rapprochés ne s'écrasent pas.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy to VPS
+        env:
+          HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          SSH="ssh -i ~/.ssh/id_ed25519 -o BatchMode=yes"
+          # Sauvegarde de l'existant (rollback possible)
+          $SSH root@"$HOST" "mkdir -p /opt/sagard/_backups && tar czf /opt/sagard/_backups/frontend-dist-\$(date +%Y%m%d-%H%M%S).tar.gz -C /opt/sagard/frontend dist || true"
+          # Envoi du nouveau build (nettoie les anciens assets)
+          rsync -az --delete -e "$SSH" dist/ root@"$HOST":/opt/sagard/frontend/dist/
+          # nginx sert les fichiers en www-data
+          $SSH root@"$HOST" "chown -R www-data:www-data /opt/sagard/frontend/dist"
+          echo "✅ Frontend déployé."

@@ -1,15 +1,17 @@
 import { useState, useEffect, useMemo, Fragment } from 'react'
 import {
   Search, MapPin, Plus, ShieldAlert, ShieldCheck, Loader2, Users, X, Building2,
-  QrCode, Pencil, Save, AlertCircle, Trash2, UserPlus, Power, Briefcase, Activity,
+  QrCode, Pencil, Save, AlertCircle, Trash2, UserPlus, Power, Briefcase, Activity, Printer,
 } from 'lucide-react'
 import { useApi } from '../lib/useApi'
 import {
   getSites, getSite, createSite, updateSite, deleteSite,
   listPatrolPoints, addPatrolPoint, disablePatrolPoint,
+  getPatrolPointQr, getPatrolPointsQrSheet,
   assignAgentToSite,
 } from '../services/sites.service'
 import AuditHistory from '../components/AuditHistory'
+import PatrolQrModal from '../components/PatrolQrModal'
 import Pagination from '../components/Pagination'
 import { getClients } from '../services/clients.service'
 import { getAgents } from '../services/agents.service'
@@ -125,6 +127,7 @@ export default function Sites() {
   const [patrolPoints, setPatrolPoints] = useState<any[]>([])
   const [showPointForm, setShowPointForm] = useState(false)
   const [pointForm, setPointForm] = useState({ name: '', sequence: '10', locationDescription: '', expectedIntervalMin: '60', instructions: '' })
+  const [qrModal, setQrModal] = useState<{ open: boolean; svg: string | null; title: string; subtitle?: string; filename: string; loading: boolean }>({ open: false, svg: null, title: '', filename: '', loading: false })
 
   const [showAssign, setShowAssign] = useState(false)
   const [assignForm, setAssignForm] = useState({ agentId: '', role: 'AGENT', shiftKind: 'JOUR', startDate: new Date().toISOString().slice(0, 10), notes: '' })
@@ -238,20 +241,48 @@ export default function Sites() {
     setPatrolPoints(pts => pts.filter(p => p.id !== id))
   }
 
+  const viewPointQr = async (p: any) => {
+    setQrModal({ open: true, svg: null, title: `QR — ${p.name}`, subtitle: `Code ${p.code}`, filename: `QR-${p.code}`, loading: true })
+    try {
+      const res = await getPatrolPointQr(p.id)
+      setQrModal(m => ({ ...m, svg: res.svg, loading: false }))
+    } catch {
+      setQrModal(m => ({ ...m, open: false, loading: false }))
+      alert('Impossible de générer le QR de ce point.')
+    }
+  }
+
+  const printAllQr = async () => {
+    if (!selectedId) return
+    const siteName = detail?.name ?? 'site'
+    setQrModal({ open: true, svg: null, title: 'Planche QR du site', subtitle: siteName, filename: `QR-${siteName}`, loading: true })
+    try {
+      const res = await getPatrolPointsQrSheet(selectedId)
+      setQrModal(m => ({ ...m, svg: res.svg, subtitle: `${res.siteName} · ${res.count} point(s)`, loading: false }))
+    } catch (e: any) {
+      setQrModal(m => ({ ...m, open: false, loading: false }))
+      alert(e?.response?.data?.message ?? 'Aucun point actif à imprimer.')
+    }
+  }
+
   const assignAgent = async () => {
     if (!selectedId || !assignForm.agentId) return
-    await assignAgentToSite(selectedId, {
-      agentId: assignForm.agentId,
-      role: assignForm.role,
-      shiftKind: assignForm.shiftKind,
-      shift: assignForm.shiftKind === 'NUIT' ? 'NUIT' : 'JOUR',
-      startDate: assignForm.startDate,
-      notes: assignForm.notes || null,
-    })
-    setShowAssign(false)
-    setAssignForm({ agentId: '', role: 'AGENT', shiftKind: 'JOUR', startDate: new Date().toISOString().slice(0, 10), notes: '' })
-    await openDetail(selectedId)
-    refetch()
+    try {
+      await assignAgentToSite(selectedId, {
+        agentId: assignForm.agentId,
+        role: assignForm.role,
+        shiftKind: assignForm.shiftKind,
+        shift: assignForm.shiftKind === 'NUIT' ? 'NUIT' : 'JOUR',
+        startDate: assignForm.startDate,
+        notes: assignForm.notes || null,
+      })
+      setShowAssign(false)
+      setAssignForm({ agentId: '', role: 'AGENT', shiftKind: 'JOUR', startDate: new Date().toISOString().slice(0, 10), notes: '' })
+      await openDetail(selectedId)
+      refetch()
+    } catch (err: any) {
+      alert(err?.response?.data?.message ?? "Impossible d'affecter ce gardien à ce site.")
+    }
   }
 
   return (
@@ -699,10 +730,18 @@ export default function Sites() {
                   <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                     <QrCode size={15} /> Points de contrôle de ronde ({patrolPoints.length})
                   </h3>
-                  <button onClick={() => setShowPointForm(s => !s)}
-                    className="flex items-center gap-1.5 bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-900">
-                    <Plus size={12} /> Ajouter un point
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {patrolPoints.length > 0 && (
+                      <button onClick={printAllQr}
+                        className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50">
+                        <Printer size={12} /> Imprimer tous les QR
+                      </button>
+                    )}
+                    <button onClick={() => setShowPointForm(s => !s)}
+                      className="flex items-center gap-1.5 bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-900">
+                      <Plus size={12} /> Ajouter un point
+                    </button>
+                  </div>
                 </div>
                 {showPointForm && (
                   <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -740,11 +779,21 @@ export default function Sites() {
                         <tr key={p.id} className="border-t border-slate-100">
                           <td className="px-3 py-2 font-mono text-slate-500">{p.sequence}</td>
                           <td className="px-3 py-2 font-medium text-slate-800">{p.name}</td>
-                          <td className="px-3 py-2 font-mono text-[10px] text-slate-600">{p.code}</td>
+                          <td className="px-3 py-2">
+                            <button onClick={() => viewPointQr(p)} title="Voir / imprimer le QR"
+                              className="font-mono text-[10px] text-slate-600 hover:text-sagard-yellow-dark hover:underline decoration-dotted underline-offset-2">
+                              {p.code}
+                            </button>
+                          </td>
                           <td className="px-3 py-2 text-slate-500">{p.locationDescription ?? '—'}</td>
                           <td className="px-3 py-2 text-slate-500">{p.expectedIntervalMin} min</td>
                           <td className="px-3 py-2 text-right">
-                            <button onClick={() => removePoint(p.id)} className="p-1 hover:bg-red-50 rounded text-red-500"><Trash2 size={12} /></button>
+                            <div className="flex items-center justify-end gap-1">
+                              <button onClick={() => viewPointQr(p)} title="Voir / imprimer le QR"
+                                className="p-1 hover:bg-sagard-yellow/20 rounded text-slate-600"><QrCode size={13} /></button>
+                              <button onClick={() => removePoint(p.id)} title="Désactiver"
+                                className="p-1 hover:bg-red-50 rounded text-red-500"><Trash2 size={12} /></button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -764,6 +813,17 @@ export default function Sites() {
         </div>
       </div>
     )}
+
+    {/* ════════════ MODAL : QR POINT DE CONTRÔLE ════════════ */}
+    <PatrolQrModal
+      open={qrModal.open}
+      onClose={() => setQrModal(m => ({ ...m, open: false }))}
+      svg={qrModal.svg}
+      title={qrModal.title}
+      subtitle={qrModal.subtitle}
+      filename={qrModal.filename}
+      loading={qrModal.loading}
+    />
 
     {/* ════════════ MODAL : AFFECTATION AGENT ════════════ */}
     {showAssign && (

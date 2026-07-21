@@ -686,7 +686,7 @@ export default function Facturation() {
                               setLine(i, 'description', v)
                               const matched = catalog.find((s: any) => `[${s.code}] ${s.description}` === v)
                               if (matched && matched.unitPrice) {
-                                setLine(i, 'unitPrice', Number(matched.unitPrice))
+                                setLine(i, 'unitPrice', String(matched.unitPrice))
                               }
                             }}
                             size="sm"
