@@ -81,7 +81,7 @@ export default function NotificationBell() {
         prevUnreadRef.current = newUnread
         isFirstLoadRef.current = false
       } else {
-        const currentIds = new Set(notifs.map((n: any) => n.id as string))
+        const currentIds = new Set<string>(notifs.map((n: any) => n.id as string))
         const newNotifs = notifs.filter((n: any) => !prevNotifIdsRef.current.has(n.id))
         if (newNotifs.length > 0 && soundOn) {
           // Play sound based on the most urgent new notification type

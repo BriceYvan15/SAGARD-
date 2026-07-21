@@ -318,7 +318,7 @@ export default function DocumentsCommerciaux() {
                               setLine(idx, 'description', v)
                               const matched = catalog.find((s: any) => `[${s.code}] ${s.description}` === v)
                               if (matched && matched.unitPrice) {
-                                setLine(idx, 'unitPrice', Number(matched.unitPrice))
+                                setLine(idx, 'unitPrice', String(matched.unitPrice))
                               }
                             }}
                               size="sm"

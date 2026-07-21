@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
-import { ArrowLeft, Printer, Loader2, Mail, Phone, Globe, Send, Download, Paperclip, X, CreditCard } from 'lucide-react'
+import { ArrowLeft, Printer, Loader2, Mail, Phone, Globe, Send, Download, Paperclip, X, CreditCard, CheckCircle } from 'lucide-react'
 import { fmt, fmtDate, daysOverdue } from '../lib/utils'
 import { useApi } from '../lib/useApi'
 import { getInvoice, sendInvoiceEmail, downloadInvoicePdf, sendInvoiceEmailWithAttachment, updateInvoiceStatus } from '../services/invoices.service'
