@@ -38,7 +38,7 @@ export default function Login() {
         </div>
 
         {/* Card */}
-        <div className="bg-slate-800 rounded-2xl p-8 shadow-2xl border border-slate-700">
+        <div className="bg-slate-800 rounded-2xl p-8 shadow-2xl border border-slate-700 animate-scale-in">
           <h2 className="text-white font-semibold text-lg mb-6">Connexion</h2>
 
           <form onSubmit={handleSubmit} className="space-y-5">

@@ -3,7 +3,15 @@ import axios from 'axios'
 const getBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
   const host = window.location.hostname
-  return `http://${host}:3001/api/v1`
+  
+  // For production domains, use the same domain with /api/v1 path
+  if (host === 'sagard.opriel.com') {
+    return `https://${host}/api/v1`
+  }
+  
+  // For local development, detect HTTPS and use appropriate protocol
+  const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:'
+  return `${protocol}//${host}:3001/api/v1`
 }
 
 export const api = axios.create({

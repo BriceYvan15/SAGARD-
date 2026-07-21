@@ -3,6 +3,8 @@ import { Package, Truck, Fuel, Wrench, Loader2, Plus, X } from 'lucide-react'
 import { useApi } from '../lib/useApi'
 import { getEquipments, getEquipmentStats, getVehicles, createEquipment, createVehicle } from '../services/stock.service'
 import { fmt, fmtDate } from '../lib/utils'
+import Select from '../components/Select'
+import DatePicker from '../components/DatePicker'
 
 const EQ_STATUS: Record<string, { label: string; cls: string }> = {
   DISPONIBLE:    { label: 'Disponible',    cls: 'bg-green-100 text-green-700' },
@@ -50,14 +52,14 @@ export default function Stock() {
       {!sLoad && s && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Total équipements', value: s.total,       icon: Package, color: 'bg-violet-500' },
-            { label: 'Disponibles',       value: s.available,   icon: Package, color: 'bg-green-500' },
-            { label: 'En service',        value: s.assigned,    icon: Wrench,  color: 'bg-blue-500' },
-            { label: 'En maintenance',    value: s.maintenance, icon: Wrench,  color: 'bg-amber-500' },
+            { label: 'Total équipements', value: s.total,       icon: Package, color: 'bg-violet-50 text-violet-600' },
+            { label: 'Disponibles',       value: s.available,   icon: Package, color: 'bg-green-50 text-green-600' },
+            { label: 'En service',        value: s.assigned,    icon: Wrench,  color: 'bg-blue-50 text-blue-600' },
+            { label: 'En maintenance',    value: s.maintenance, icon: Wrench,  color: 'bg-amber-50 text-amber-600' },
           ].map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
-                <Icon size={20} className="text-white" />
+            <div key={label} className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3 hover:shadow-md hover:-translate-y-0.5 transition-all">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
+                <Icon size={18} />
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-800">{value}</p>
@@ -69,7 +71,7 @@ export default function Stock() {
       )}
 
       {/* Tabs */}
-      <div className="bg-white rounded-xl border border-slate-200 p-1.5 flex gap-1 w-fit">
+      <div className="bg-white rounded-xl border border-slate-200 p-1.5 flex gap-1 w-fit shadow-sm">
         <Tab active={tab === 'equipments'} onClick={() => setTab('equipments')}>📦 Équipements</Tab>
         <Tab active={tab === 'vehicles'}   onClick={() => setTab('vehicles')}>🚗 Véhicules</Tab>
       </div>
@@ -88,11 +90,12 @@ export default function Stock() {
             <div className="flex justify-center py-12"><Loader2 className="animate-spin text-slate-400" /></div>
           ) : (
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-slate-50 border-b border-slate-200">
                     {['Code', 'Équipement', 'Catégorie', 'Statut', 'Assigné à', 'Date achat'].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -118,6 +121,7 @@ export default function Stock() {
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>
@@ -140,7 +144,7 @@ export default function Stock() {
               {((vehicles as any[]) ?? []).map((v: any) => {
                 const st = VEH_STATUS[v.status] ?? { label: v.status, cls: '' }
                 return (
-                  <div key={v.id} className="bg-white rounded-xl border border-slate-200 p-4">
+                  <div key={v.id} className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md hover:-translate-y-0.5 transition-all">
                     <div className="flex items-start justify-between mb-2">
                       <div>
                         <div className="font-semibold text-slate-800 flex items-center gap-2">
@@ -193,7 +197,7 @@ export default function Stock() {
               finally { setSaving(false) }
             }} className="px-6 py-5 space-y-4">
               {formError && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{formError}</div>}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Nom *</label>
                   <input value={eqForm.name} onChange={e => setEqForm(f => ({ ...f, name: e.target.value }))} required placeholder="Ex: Talkie-walkie Motorola"
@@ -205,21 +209,11 @@ export default function Stock() {
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Catégorie</label>
-                  <select value={eqForm.category} onChange={e => setEqForm(f => ({ ...f, category: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white">
-                    <option value="RADIO">Radio / Talkie-walkie</option>
-                    <option value="LAMPE">Lampe torche</option>
-                    <option value="UNIFORME">Uniforme</option>
-                    <option value="GILET">Gilet pare-balles</option>
-                    <option value="BATON">Bâton / Matraque</option>
-                    <option value="MENOTTE">Menotte</option>
-                    <option value="DETECTEUR">Détecteur de métaux</option>
-                    <option value="CAMERA">Caméra</option>
-                    <option value="AUTRE">Autre</option>
-                  </select>
+                  <Select value={eqForm.category} onChange={v => setEqForm(f => ({ ...f, category: v }))}
+                    options={[{ value: 'RADIO', label: 'Radio / Talkie-walkie' }, { value: 'LAMPE', label: 'Lampe torche' }, { value: 'UNIFORME', label: 'Uniforme' }, { value: 'GILET', label: 'Gilet pare-balles' }, { value: 'BATON', label: 'Bâton / Matraque' }, { value: 'MENOTTE', label: 'Menotte' }, { value: 'DETECTEUR', label: 'Détecteur de métaux' }, { value: 'CAMERA', label: 'Caméra' }, { value: 'AUTRE', label: 'Autre' }]} className="w-full" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">N° série</label>
@@ -229,8 +223,7 @@ export default function Stock() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Date d'achat</label>
-                <input type="date" value={eqForm.purchaseDate} onChange={e => setEqForm(f => ({ ...f, purchaseDate: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                <DatePicker value={eqForm.purchaseDate} onChange={v => setEqForm(f => ({ ...f, purchaseDate: v }))} className="w-full" />
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setShowEqModal(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-sm">Annuler</button>
@@ -267,7 +260,7 @@ export default function Stock() {
               finally { setSaving(false) }
             }} className="px-6 py-5 space-y-4">
               {formError && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{formError}</div>}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Marque *</label>
                   <input value={vehForm.brand} onChange={e => setVehForm(f => ({ ...f, brand: e.target.value }))} required placeholder="Ex: Toyota"
@@ -279,7 +272,7 @@ export default function Stock() {
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Immatriculation *</label>
                   <input value={vehForm.plateNumber} onChange={e => setVehForm(f => ({ ...f, plateNumber: e.target.value }))} required placeholder="Ex: AB-1234-CI"
@@ -287,16 +280,11 @@ export default function Stock() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Type</label>
-                  <select value={vehForm.type} onChange={e => setVehForm(f => ({ ...f, type: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white">
-                    <option value="VOITURE">Voiture</option>
-                    <option value="MOTO">Moto</option>
-                    <option value="PICKUP">Pickup</option>
-                    <option value="FOURGON">Fourgon</option>
-                  </select>
+                  <Select value={vehForm.type} onChange={v => setVehForm(f => ({ ...f, type: v }))}
+                    options={[{ value: 'VOITURE', label: 'Voiture' }, { value: 'MOTO', label: 'Moto' }, { value: 'PICKUP', label: 'Pickup' }, { value: 'FOURGON', label: 'Fourgon' }]} className="w-full" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Année</label>
                   <input type="number" value={vehForm.year} onChange={e => setVehForm(f => ({ ...f, year: e.target.value }))} placeholder="2024"

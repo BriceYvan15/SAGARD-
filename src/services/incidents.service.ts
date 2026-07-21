@@ -12,6 +12,18 @@ export const closeIncident       = (id: string) => api.post(`/incidents/${id}/cl
 export const addIncidentAgent    = (id: string, agentId: string, role?: string) => api.post(`/incidents/${id}/agents`, { agentId, role }).then(r => r.data)
 export const removeIncidentAgent = (id: string, agentId: string) => api.post(`/incidents/${id}/agents/${agentId}/remove`).then(r => r.data)
 
+// Rapport d'incident (chef des opérations)
+export const submitOpsReport      = (id: string, report: string) => api.post(`/incidents/${id}/ops-report`, { report }).then(r => r.data)
+export const validateOpsReport    = (id: string) => api.post(`/incidents/${id}/ops-report/validate`).then(r => r.data)
+export const rejectOpsReport      = (id: string, reason?: string) => api.post(`/incidents/${id}/ops-report/reject`, { reason }).then(r => r.data)
+
+export const OPS_REPORT_STATES = [
+  { value: 'PENDING',  label: 'En attente',  color: 'slate'  },
+  { value: 'SOUMIS',   label: 'Soumis',      color: 'amber'  },
+  { value: 'VALIDE',   label: 'Validé',      color: 'green'  },
+  { value: 'REJETE',   label: 'Rejeté',      color: 'red'    },
+] as const
+
 export const INCIDENT_TYPES = [
   { value: 'INTRUSION',     label: "Tentative d'intrusion" },
   { value: 'VOL',           label: 'Vol' },

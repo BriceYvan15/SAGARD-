@@ -1,7 +1,7 @@
-import { useState, useEffect, Fragment } from 'react'
+import { useState, useEffect, useMemo, Fragment } from 'react'
 import {
   Search, MapPin, Plus, ShieldAlert, ShieldCheck, Loader2, Users, X, Building2,
-  QrCode, Pencil, Save, AlertCircle, Trash2, UserPlus, Power,
+  QrCode, Pencil, Save, AlertCircle, Trash2, UserPlus, Power, Briefcase, Activity,
 } from 'lucide-react'
 import { useApi } from '../lib/useApi'
 import {
@@ -10,14 +10,18 @@ import {
   assignAgentToSite,
 } from '../services/sites.service'
 import AuditHistory from '../components/AuditHistory'
+import Pagination from '../components/Pagination'
 import { getClients } from '../services/clients.service'
 import { getAgents } from '../services/agents.service'
 import { DEPLOYMENT_ROLES, DEPLOYMENT_SHIFTS } from '../services/deployments.service'
+import Select from '../components/Select'
+import DatePicker from '../components/DatePicker'
 
 const RISK_CFG: Record<string, { label: string; cls: string; icon: any }> = {
-  FAIBLE: { label: 'Faible', cls: 'bg-green-100 text-green-700',  icon: ShieldCheck },
-  MOYEN:  { label: 'Moyen',  cls: 'bg-amber-100 text-amber-700',  icon: ShieldAlert },
-  ELEVE:  { label: 'Élevé',  cls: 'bg-red-100 text-red-700',      icon: ShieldAlert },
+  FAIBLE:   { label: 'Faible',   cls: 'bg-green-100 text-green-700',  icon: ShieldCheck },
+  MOYEN:    { label: 'Moyen',    cls: 'bg-amber-100 text-amber-700',  icon: ShieldAlert },
+  ELEVE:    { label: 'Élevé',    cls: 'bg-red-100 text-red-700',      icon: ShieldAlert },
+  CRITIQUE: { label: 'Critique', cls: 'bg-red-900 text-red-100',      icon: ShieldAlert },
 }
 
 const STATUS_CFG: Record<string, { label: string; cls: string }> = {
@@ -26,7 +30,7 @@ const STATUS_CFG: Record<string, { label: string; cls: string }> = {
   SUSPENDU: { label: 'Suspendu',cls: 'bg-red-100 text-red-700' },
 }
 
-const SITE_TYPES = [
+const DEFAULT_SITE_TYPES = [
   { value: 'VILLA',     label: 'Villa / Résidence' },
   { value: 'IMMEUBLE',  label: 'Immeuble' },
   { value: 'ENTREPOT',  label: 'Entrepôt' },
@@ -36,7 +40,38 @@ const SITE_TYPES = [
   { value: 'BANQUE',    label: 'Banque / Agence' },
   { value: 'CHANTIER',  label: 'Chantier' },
   { value: 'AUTRE',     label: 'Autre' },
-] as const
+]
+
+const SITE_TYPE_MAP: Record<string, string> = {
+  'VILLA / RÉSIDENCE': 'VILLA',
+  'VILLA / RESIDENCE': 'VILLA',
+  'VILLA': 'VILLA',
+  'IMMEUBLE': 'IMMEUBLE',
+  'ENTREPÔT': 'ENTREPOT',
+  'ENTREPOT': 'ENTREPOT',
+  'USINE': 'USINE',
+  'BUREAU': 'BUREAU',
+  'COMMERCE': 'COMMERCE',
+  'BANQUE / AGENCE': 'BANQUE',
+  'BANQUE': 'BANQUE',
+  'CHANTIER': 'CHANTIER',
+  'AUTRE': 'AUTRE',
+}
+
+function getSiteTypes(): { value: string; label: string }[] {
+  try {
+    const s = localStorage.getItem('sagard_site_types')
+    if (s) {
+      const items: string[] = JSON.parse(s)
+      return items.map(label => {
+        const normalized = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+        const value = SITE_TYPE_MAP[normalized] ?? normalized.replace(/[^A-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')
+        return { value, label }
+      })
+    }
+  } catch {}
+  return DEFAULT_SITE_TYPES
+}
 
 const RISK_LEVELS = [
   { value: 'FAIBLE',   label: 'Faible'   },
@@ -70,7 +105,13 @@ const TABS = [
 
 export default function Sites() {
   const [search, setSearch] = useState('')
-  const [risk, setRisk]     = useState('all')
+  const [risk, setRisk]       = useState('all')
+  const [status, setStatus]   = useState('all')
+  const [siteType, setSiteType] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(9)
+  const [activeKpi, setActiveKpi] = useState<string | null>(null)
+  const [siteTypes, setSiteTypes] = useState(getSiteTypes())
 
   const [showModal, setShowModal] = useState(false)
   const [tab, setTab] = useState<typeof TABS[number]['key']>('identification')
@@ -96,17 +137,44 @@ export default function Sites() {
   const clients = (clientsRaw as any[]) ?? []
   const agents  = (agentsRaw as any[]) ?? []
 
+  useEffect(() => {
+    const handler = () => setSiteTypes(getSiteTypes())
+    window.addEventListener('storage', handler)
+    return () => window.removeEventListener('storage', handler)
+  }, [])
+
   const filtered = all.filter(s => {
     const q = search.toLowerCase()
     const matchSearch = s.name.toLowerCase().includes(q)
       || (s.code ?? '').toLowerCase().includes(q)
       || (s.client?.name ?? '').toLowerCase().includes(q)
       || (s.district ?? s.city ?? '').toLowerCase().includes(q)
-    const matchRisk = risk === 'all' || s.riskLevel === risk
-    return matchSearch && matchRisk
+    const matchRisk   = risk === 'all'     || s.riskLevel === risk
+    const matchStatus = status === 'all'   || s.status === status
+    const matchType   = siteType === 'all' || s.siteType === siteType
+    return matchSearch && matchRisk && matchStatus && matchType
   })
 
   const totalAgents = all.reduce((sum, s) => sum + (s._count?.deployments ?? s.deployments?.length ?? 0), 0)
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filtered.slice(start, start + pageSize)
+  }, [filtered, page, pageSize])
+
+  const goToPage = (p: number) => setPage(Math.max(1, Math.min(p, Math.ceil(filtered.length / pageSize))))
+
+  const resetFilters = () => { setRisk('all'); setStatus('all'); setSiteType('all'); setActiveKpi(null) }
+
+  const handleKpiClick = (kpi: string) => {
+    if (activeKpi === kpi) { resetFilters(); return }
+    setActiveKpi(kpi)
+    setPage(1)
+    if (kpi === 'total')     { setRisk('all');     setStatus('all');   setSiteType('all') }
+    if (kpi === 'actif')     { setRisk('all');     setStatus('ACTIF'); setSiteType('all') }
+    if (kpi === 'risque')    { setRisk('ELEVE');   setStatus('all');   setSiteType('all') }
+    if (kpi === 'agents')    { setRisk('all');     setStatus('all');   setSiteType('all') }
+  }
 
   /* ───── Création / Édition ───── */
   const openCreate = () => { setForm(emptyForm()); setEditingSite(null); setTab('identification'); setFormError(null); setShowModal(true) }
@@ -189,100 +257,163 @@ export default function Sites() {
   return (
     <Fragment>
     <div className="space-y-5">
-      {/* KPIs */}
+      {/* KPIs — cliquables pour filtrer */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          {loading ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
-            : <p className="text-2xl font-black text-slate-800">{all.length}</p>}
-          <p className="text-xs text-slate-500">Sites total</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          {loading ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
-            : <p className="text-2xl font-black text-green-600">{all.filter(s => s.status === 'ACTIF').length}</p>}
-          <p className="text-xs text-slate-500">Sites actifs</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-red-200 bg-red-50">
-          {loading ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
-            : <p className="text-2xl font-black text-red-600">{all.filter(s => s.riskLevel === 'ELEVE').length}</p>}
-          <p className="text-xs text-red-700">Risque élevé</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-sagard-yellow shadow-sm">
-          {loading ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
-            : <p className="text-2xl font-black text-slate-800">{totalAgents}</p>}
-          <p className="text-xs text-slate-500">Agents déployés</p>
-        </div>
+        <button
+          onClick={() => handleKpiClick('total')}
+          className={`bg-white rounded-xl p-4 border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-3 text-left ${activeKpi === 'total' ? 'border-sagard-yellow ring-2 ring-sagard-yellow/30' : 'border-slate-200'}`}>
+          <div className="w-11 h-11 rounded-xl bg-slate-800 flex items-center justify-center flex-shrink-0"><Building2 size={20} className="text-sagard-yellow" /></div>
+          <div>
+            {loading ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
+              : <p className="text-2xl font-black text-slate-800">{all.length}</p>}
+            <p className="text-xs text-slate-500 font-medium">Sites total</p>
+          </div>
+        </button>
+        <button
+          onClick={() => handleKpiClick('actif')}
+          className={`bg-white rounded-xl p-4 border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-3 text-left ${activeKpi === 'actif' ? 'border-green-400 ring-2 ring-green-200' : 'border-slate-200'}`}>
+          <div className="w-11 h-11 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0"><ShieldCheck size={20} className="text-green-600" /></div>
+          <div>
+            {loading ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
+              : <p className="text-2xl font-black text-green-600">{all.filter(s => s.status === 'ACTIF').length}</p>}
+            <p className="text-xs text-slate-500 font-medium">Sites actifs</p>
+          </div>
+        </button>
+        <button
+          onClick={() => handleKpiClick('risque')}
+          className={`bg-white rounded-xl p-4 border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-3 text-left ${activeKpi === 'risque' ? 'border-red-400 ring-2 ring-red-200' : 'border-slate-200'}`}>
+          <div className="w-11 h-11 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0"><ShieldAlert size={20} className="text-red-600" /></div>
+          <div>
+            {loading ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
+              : <p className="text-2xl font-black text-red-600">{all.filter(s => s.riskLevel === 'ELEVE').length}</p>}
+            <p className="text-xs text-slate-500 font-medium">Risque élevé</p>
+          </div>
+        </button>
+        <button
+          onClick={() => handleKpiClick('agents')}
+          className={`bg-white rounded-xl p-4 border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-3 text-left ${activeKpi === 'agents' ? 'border-sagard-yellow ring-2 ring-sagard-yellow/30' : 'border-slate-200'}`}>
+          <div className="w-11 h-11 rounded-xl bg-sagard-yellow/15 flex items-center justify-center flex-shrink-0"><Users size={20} className="text-sagard-yellow-dark" /></div>
+          <div>
+            {loading ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
+              : <p className="text-2xl font-black text-slate-800">{totalAgents}</p>}
+            <p className="text-xs text-slate-500 font-medium">Agents déployés</p>
+          </div>
+        </button>
       </div>
 
       {/* Card grid */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 border-b border-slate-100">
-          <div className="relative w-full sm:w-72">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Nom, client, district..."
-              className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {(['all','FAIBLE','MOYEN','ELEVE'] as const).map(r => (
-              <button key={r} onClick={() => setRisk(r)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${risk === r ? 'bg-sagard-yellow text-sagard-dark' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                {r === 'all' ? 'Tous' : (RISK_CFG[r]?.label ?? r)}
-              </button>
-            ))}
-            <button onClick={openCreate} className="flex items-center gap-1.5 bg-sagard-yellow text-sagard-dark px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-sagard-yellow-dark transition-colors">
+        {/* Filters bar */}
+        <div className="flex flex-col gap-3 p-4 border-b border-slate-100">
+          {/* Row 1: Search + New button */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="relative w-full sm:w-72">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+                placeholder="Nom, client, district..."
+                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+            </div>
+            <button onClick={openCreate} className="flex items-center gap-1.5 bg-sagard-yellow text-sagard-dark px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-sagard-yellow-dark transition-colors whitespace-nowrap">
               <Plus size={13} /> Nouveau site
             </button>
+          </div>
+          {/* Row 2: Filter pills */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Status filter */}
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">Statut</span>
+              {(['all', 'ACTIF', 'INACTIF', 'SUSPENDU'] as const).map(s => (
+                <button key={s} onClick={() => { setStatus(s); setPage(1); setActiveKpi(s === 'all' && risk === 'all' && siteType === 'all' ? null : activeKpi) }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${status === s ? 'bg-sagard-yellow text-sagard-dark' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                  {s === 'all' ? 'Tous' : (STATUS_CFG[s]?.label ?? s)}
+                </button>
+              ))}
+            </div>
+            <div className="w-px h-5 bg-slate-200" />
+            {/* Risk filter */}
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">Risque</span>
+              {(['all', 'FAIBLE', 'MOYEN', 'ELEVE', 'CRITIQUE'] as const).map(r => (
+                <button key={r} onClick={() => { setRisk(r); setPage(1); setActiveKpi(r === 'all' && status === 'all' && siteType === 'all' ? null : activeKpi) }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${risk === r ? 'bg-sagard-yellow text-sagard-dark' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                  {r === 'all' ? 'Tous' : (RISK_CFG[r]?.label ?? r)}
+                </button>
+              ))}
+            </div>
+            <div className="w-px h-5 bg-slate-200" />
+            {/* Site type filter */}
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">Type</span>
+              <Select
+                value={siteType}
+                onChange={v => { setSiteType(v); setPage(1) }}
+                options={siteTypes.map(t => ({ value: t.value, label: t.label }))}
+                placeholder="Tous"
+                size="sm"
+                className="w-full"
+              />
+            </div>
+            {/* Reset */}
+            {(risk !== 'all' || status !== 'all' || siteType !== 'all' || activeKpi) && (
+              <button onClick={resetFilters} className="ml-auto text-xs text-slate-500 hover:text-red-600 flex items-center gap-1 transition-colors">
+                <X size={12} /> Réinitialiser
+              </button>
+            )}
           </div>
         </div>
 
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="animate-spin text-slate-300" size={28} /></div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-            {filtered.map(site => {
-              const rCfg  = RISK_CFG[site.riskLevel] ?? { label: site.riskLevel ?? '—', cls: 'bg-slate-100 text-slate-500', icon: ShieldCheck }
-              const sCfg  = STATUS_CFG[site.status]  ?? { label: site.status ?? '—',    cls: 'bg-slate-100 text-slate-500' }
-              const RiskIcon = rCfg.icon
-              const nbAgents = site._count?.deployments ?? site.deployments?.length ?? 0
-
-              return (
-                <button type="button" key={site.id} onClick={() => openDetail(site.id)}
-                  className="text-left border border-slate-200 rounded-xl p-4 hover:border-sagard-yellow/50 hover:shadow-md transition-all bg-white">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-lg bg-sagard-yellow/20 flex items-center justify-center">
-                        <MapPin size={16} className="text-sagard-yellow-dark" />
-                      </div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${sCfg.cls}`}>{sCfg.label}</span>
-                    </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 ${rCfg.cls}`}>
-                      <RiskIcon size={10} /> {rCfg.label}
-                    </span>
-                  </div>
-                  {site.code && <p className="text-[10px] font-mono text-slate-400 mb-0.5">{site.code}</p>}
-                  <h3 className="font-bold text-slate-800 text-sm leading-snug mb-1">{site.name}</h3>
-                  <p className="text-xs text-slate-500 mb-3">{site.client?.name ?? '—'}</p>
-                  <div className="text-xs text-slate-500 space-y-1">
-                    <p className="flex items-center gap-1">
-                      <MapPin size={10} /> {[site.address, site.district ?? site.city].filter(Boolean).join(', ') || '—'}
-                    </p>
-                    <p className="flex items-center gap-1">
-                      <Users size={10} />
-                      <span className="font-semibold text-sagard-yellow-dark">{nbAgents}</span>&nbsp;agents&nbsp;·&nbsp;
-                      <QrCode size={10} />
-                      <span className="font-semibold text-slate-600">{site._count?.patrolPoints ?? 0}</span>&nbsp;pts QR
-                    </p>
-                  </div>
-                </button>
-              )
-            })}
-            {filtered.length === 0 && (
-              <div className="col-span-3 text-center py-12 text-slate-400">
-                <MapPin size={40} className="mx-auto mb-3 opacity-30" />
-                <p>{search || risk !== 'all' ? 'Aucun résultat' : 'Aucun site enregistré'}</p>
-              </div>
-            )}
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-16 text-slate-400">
+            <MapPin size={40} className="mx-auto mb-3 opacity-30" />
+            <p>{search || risk !== 'all' || status !== 'all' || siteType !== 'all' ? 'Aucun résultat' : 'Aucun site enregistré'}</p>
           </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+              {paginated.map(site => {
+                const rCfg  = RISK_CFG[site.riskLevel] ?? { label: site.riskLevel ?? '—', cls: 'bg-slate-100 text-slate-500', icon: ShieldCheck }
+                const sCfg  = STATUS_CFG[site.status]  ?? { label: site.status ?? '—',    cls: 'bg-slate-100 text-slate-500' }
+                const RiskIcon = rCfg.icon
+                const nbAgents = site._count?.deployments ?? site.deployments?.length ?? 0
+
+                return (
+                  <button type="button" key={site.id} onClick={() => openDetail(site.id)}
+                    className="text-left border border-slate-200 rounded-xl p-4 hover:border-sagard-yellow/50 hover:shadow-md hover:-translate-y-0.5 transition-all bg-white">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-lg bg-sagard-yellow/20 flex items-center justify-center">
+                          <MapPin size={16} className="text-sagard-yellow-dark" />
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${sCfg.cls}`}>{sCfg.label}</span>
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 ${rCfg.cls}`}>
+                        <RiskIcon size={10} /> {rCfg.label}
+                      </span>
+                    </div>
+                    {site.code && <p className="text-[10px] font-mono text-slate-400 mb-0.5">{site.code}</p>}
+                    <h3 className="font-bold text-slate-800 text-sm leading-snug mb-1">{site.name}</h3>
+                    <p className="text-xs text-slate-500 mb-3">{site.client?.name ?? '—'}</p>
+                    <div className="text-xs text-slate-500 space-y-1">
+                      <p className="flex items-center gap-1">
+                        <MapPin size={10} /> {[site.address, site.district ?? site.city].filter(Boolean).join(', ') || '—'}
+                      </p>
+                      <p className="flex items-center gap-1">
+                        <Users size={10} />
+                        <span className="font-semibold text-sagard-yellow-dark">{nbAgents}</span>&nbsp;agents&nbsp;·&nbsp;
+                        <QrCode size={10} />
+                        <span className="font-semibold text-slate-600">{site._count?.patrolPoints ?? 0}</span>&nbsp;pts QR
+                      </p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+            {filtered.length > 0 && (
+              <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={goToPage} onPageSizeChange={s => { setPageSize(s); setPage(1) }} />
+            )}
+          </>
         )}
       </div>
     </div>
@@ -314,8 +445,8 @@ export default function Sites() {
           <form onSubmit={submit} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
             {/* IDENTIFICATION */}
             {tab === 'identification' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Nom du site *</label>
                   <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required
                     placeholder="Ex: Villa Cocody Riviera, Agence Plateau..."
@@ -323,29 +454,21 @@ export default function Sites() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Client *</label>
-                  <select value={form.clientId} onChange={e => setForm(f => ({ ...f, clientId: e.target.value, contactId: '' }))} required
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                    <option value="">— Sélectionner —</option>
-                    {clients.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <Select value={form.clientId} onChange={v => setForm(f => ({ ...f, clientId: v, contactId: '' }))}
+                    options={clients.map((c: any) => ({ value: c.id, label: c.name }))}
+                    placeholder="— Sélectionner —" className="w-full" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Contact sur site</label>
-                  <select value={form.contactId} onChange={e => setForm(f => ({ ...f, contactId: e.target.value }))}
+                  <Select value={form.contactId} onChange={v => setForm(f => ({ ...f, contactId: v }))}
                     disabled={!form.clientId}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white disabled:bg-slate-50 disabled:text-slate-400">
-                    <option value="">— Aucun —</option>
-                    {(clients.find((c: any) => c.id === form.clientId)?.contacts ?? []).map((ct: any) => (
-                      <option key={ct.id} value={ct.id}>{ct.firstName} {ct.lastName} {ct.position ? `— ${ct.position}` : ''}</option>
-                    ))}
-                  </select>
+                    options={(clients.find((c: any) => c.id === form.clientId)?.contacts ?? []).map((ct: any) => ({ value: ct.id, label: `${ct.firstName} ${ct.lastName}${ct.position ? ` — ${ct.position}` : ''}` }))}
+                    placeholder="— Aucun —" className="w-full" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Type de site *</label>
-                  <select value={form.siteType} onChange={e => setForm(f => ({ ...f, siteType: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                    {SITE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
+                  <Select value={form.siteType} onChange={v => setForm(f => ({ ...f, siteType: v }))}
+                    options={siteTypes.map(t => ({ value: t.value, label: t.label }))} className="w-full" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Surface (m²)</label>
@@ -357,8 +480,8 @@ export default function Sites() {
 
             {/* ADRESSE & GPS */}
             {tab === 'address' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Adresse *</label>
                   <input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} required
                     placeholder="Rue, immeuble, lot..."
@@ -374,7 +497,7 @@ export default function Sites() {
                   <input value={form.district} onChange={e => setForm(f => ({ ...f, district: e.target.value }))}
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Pays</label>
                   <input value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
@@ -396,32 +519,28 @@ export default function Sites() {
 
             {/* CONFIGURATION */}
             {tab === 'config' && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Niveau de risque *</label>
-                  <select value={form.riskLevel} onChange={e => setForm(f => ({ ...f, riskLevel: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                    {RISK_LEVELS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                  </select>
+                  <Select value={form.riskLevel} onChange={v => setForm(f => ({ ...f, riskLevel: v }))}
+                    options={RISK_LEVELS.map(r => ({ value: r.value, label: r.label }))} className="w-full" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Effectif requis *</label>
                   <input type="number" min={1} value={form.nbAgentsRequired} onChange={e => setForm(f => ({ ...f, nbAgentsRequired: e.target.value }))}
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Nombre de vacations</label>
-                  <select value={form.nbShifts} onChange={e => setForm(f => ({ ...f, nbShifts: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                    {SHIFTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
+                  <Select value={form.nbShifts} onChange={v => setForm(f => ({ ...f, nbShifts: v }))}
+                    options={SHIFTS.map(s => ({ value: s.value, label: s.label }))} className="w-full" />
                 </div>
-                <label className="col-span-2 flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg cursor-pointer">
+                <label className="col-span-1 sm:col-span-2 flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg cursor-pointer">
                   <input type="checkbox" checked={form.hasArmed} onChange={e => setForm(f => ({ ...f, hasArmed: e.target.checked }))}
                     className="w-4 h-4 accent-sagard-yellow-dark" />
                   <span className="text-sm text-slate-700">Agents armés requis</span>
                 </label>
-                <label className="col-span-2 flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg cursor-pointer">
+                <label className="col-span-1 sm:col-span-2 flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg cursor-pointer">
                   <input type="checkbox" checked={form.hasCanine} onChange={e => setForm(f => ({ ...f, hasCanine: e.target.checked }))}
                     className="w-4 h-4 accent-sagard-yellow-dark" />
                   <span className="text-sm text-slate-700">Maître-chien requis</span>
@@ -518,13 +637,13 @@ export default function Sites() {
           ) : (
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
               {/* Infos */}
-              <div className="grid grid-cols-4 gap-3">
-                <Info label="Type"   value={SITE_TYPES.find(t => t.value === detail.siteType)?.label ?? detail.siteType} />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Info label="Type"   value={siteTypes.find(t => t.value === detail.siteType)?.label ?? detail.siteType} />
                 <Info label="Risque" value={RISK_LEVELS.find(r => r.value === detail.riskLevel)?.label ?? detail.riskLevel} />
                 <Info label="Effectif requis" value={`${detail.nbAgentsRequired} agent(s)`} />
                 <Info label="Vacations" value={SHIFTS.find(s => s.value === detail.nbShifts)?.label ?? detail.nbShifts} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Info label="Adresse" value={[detail.address, detail.district, detail.city, detail.country].filter(Boolean).join(', ')} />
                 <Info label="GPS" value={detail.latitude && detail.longitude ? `${detail.latitude}, ${detail.longitude}` : '—'} />
               </div>
@@ -547,6 +666,7 @@ export default function Sites() {
                   </button>
                 </div>
                 <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead className="bg-slate-50">
                       <tr>{['Agent', 'Matricule', 'Rôle', 'Vacation', 'Début', 'Statut'].map(h =>
@@ -569,6 +689,7 @@ export default function Sites() {
                       )}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </div>
 
@@ -584,21 +705,21 @@ export default function Sites() {
                   </button>
                 </div>
                 {showPointForm && (
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-3 grid grid-cols-2 gap-2">
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <input value={pointForm.name} onChange={e => setPointForm(p => ({ ...p, name: e.target.value }))}
                       placeholder="Désignation (ex: Entrée principale)"
-                      className="col-span-2 px-3 py-2 text-sm border border-slate-200 rounded-lg" />
+                      className="col-span-1 sm:col-span-2 px-3 py-2 text-sm border border-slate-200 rounded-lg" />
                     <input type="number" value={pointForm.sequence} onChange={e => setPointForm(p => ({ ...p, sequence: e.target.value }))}
                       placeholder="Ordre" className="px-3 py-2 text-sm border border-slate-200 rounded-lg" />
                     <input type="number" value={pointForm.expectedIntervalMin} onChange={e => setPointForm(p => ({ ...p, expectedIntervalMin: e.target.value }))}
                       placeholder="Intervalle attendu (min)" className="px-3 py-2 text-sm border border-slate-200 rounded-lg" />
                     <input value={pointForm.locationDescription} onChange={e => setPointForm(p => ({ ...p, locationDescription: e.target.value }))}
                       placeholder="Description emplacement"
-                      className="col-span-2 px-3 py-2 text-sm border border-slate-200 rounded-lg" />
+                      className="col-span-1 sm:col-span-2 px-3 py-2 text-sm border border-slate-200 rounded-lg" />
                     <textarea value={pointForm.instructions} onChange={e => setPointForm(p => ({ ...p, instructions: e.target.value }))}
                       placeholder="Consignes au point" rows={2}
-                      className="col-span-2 px-3 py-2 text-sm border border-slate-200 rounded-lg resize-none" />
-                    <div className="col-span-2 flex justify-end gap-2">
+                      className="col-span-1 sm:col-span-2 px-3 py-2 text-sm border border-slate-200 rounded-lg resize-none" />
+                    <div className="col-span-1 sm:col-span-2 flex justify-end gap-2">
                       <button type="button" onClick={() => setShowPointForm(false)}
                         className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs">Annuler</button>
                       <button type="button" onClick={addPoint}
@@ -607,6 +728,7 @@ export default function Sites() {
                   </div>
                 )}
                 <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead className="bg-slate-50">
                       <tr>{['Ordre', 'Désignation', 'Code QR', 'Emplacement', 'Intervalle', ''].map(h =>
@@ -631,6 +753,7 @@ export default function Sites() {
                       )}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </div>
 
@@ -655,34 +778,25 @@ export default function Sites() {
           <div className="p-5 space-y-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Agent *</label>
-              <select value={assignForm.agentId} onChange={e => setAssignForm(f => ({ ...f, agentId: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white">
-                <option value="">— Sélectionner —</option>
-                {agents.map((a: any) => (
-                  <option key={a.id} value={a.id}>{a.matricule} — {a.user?.firstName} {a.user?.lastName}</option>
-                ))}
-              </select>
+              <Select value={assignForm.agentId} onChange={v => setAssignForm(f => ({ ...f, agentId: v }))}
+                options={agents.map((a: any) => ({ value: a.id, label: `${a.matricule} — ${a.user?.firstName} ${a.user?.lastName}` }))}
+                placeholder="— Sélectionner —" className="w-full" />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Rôle</label>
-                <select value={assignForm.role} onChange={e => setAssignForm(f => ({ ...f, role: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white">
-                  {DEPLOYMENT_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                </select>
+                <Select value={assignForm.role} onChange={v => setAssignForm(f => ({ ...f, role: v }))}
+                  options={DEPLOYMENT_ROLES.map(r => ({ value: r.value, label: r.label }))} className="w-full" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Vacation</label>
-                <select value={assignForm.shiftKind} onChange={e => setAssignForm(f => ({ ...f, shiftKind: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white">
-                  {DEPLOYMENT_SHIFTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </select>
+                <Select value={assignForm.shiftKind} onChange={v => setAssignForm(f => ({ ...f, shiftKind: v }))}
+                  options={DEPLOYMENT_SHIFTS.map(s => ({ value: s.value, label: s.label }))} className="w-full" />
               </div>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Date de début</label>
-              <input type="date" value={assignForm.startDate} onChange={e => setAssignForm(f => ({ ...f, startDate: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg" />
+              <DatePicker value={assignForm.startDate} onChange={v => setAssignForm(f => ({ ...f, startDate: v }))} className="w-full" />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Notes</label>

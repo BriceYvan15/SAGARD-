@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Clients from './pages/Clients'
+import ClientDetail from './pages/ClientDetail'
 import Contrats from './pages/Contrats'
 import Sites from './pages/Sites'
 import Agents from './pages/Agents'
@@ -29,6 +30,9 @@ function HomeRedirect() {
   const user = getUser()
   if (user?.role === 'AGENT_ACCUEIL') return <Navigate to="/accueil" replace />
   if (user?.role === 'COMMERCIAL') return <Navigate to="/prospects" replace />
+  if (user?.role === 'RH') return <Navigate to="/rh" replace />
+  if (user?.role === 'CHEF_OPERATIONS') return <Navigate to="/operations" replace />
+  if (user?.role === 'CONTROLEUR') return <Navigate to="/operations" replace />
   return <Navigate to="/dashboard" replace />
 }
 
@@ -42,6 +46,7 @@ export default function App() {
             <Route index element={<HomeRedirect />} />
             <Route path="dashboard"   element={<Dashboard />} />
             <Route path="clients"     element={<Clients />} />
+            <Route path="clients/:id"  element={<ClientDetail />} />
             <Route path="contrats"    element={<Contrats />} />
             <Route path="sites"       element={<Sites />} />
             <Route path="agents"      element={<Agents />} />

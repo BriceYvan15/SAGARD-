@@ -1,10 +1,13 @@
-import { Fragment, useState } from 'react'
-import { Search, Plus, UserCheck, Loader2, X, Award, AlertTriangle } from 'lucide-react'
+import { Fragment, useState, useMemo } from 'react'
+import { Search, Plus, UserCheck, Loader2, X, Award, AlertTriangle, Users, ShieldCheck, GraduationCap, Plane } from 'lucide-react'
+import Pagination from '../components/Pagination'
 import { fmtDate } from '../lib/utils'
 import { useApi } from '../lib/useApi'
 import { getAgents, createAgent, createAgentWithUser } from '../services/agents.service'
 import { getUsers } from '../services/users.service'
 import AgentDetailModal from '../components/AgentDetailModal'
+import Select from '../components/Select'
+import DatePicker from '../components/DatePicker'
 
 const STATUS_CFG: Record<string, { label: string; cls: string }> = {
   EN_POSTE:     { label: 'En poste',       cls: 'bg-green-100 text-green-700' },
@@ -63,6 +66,8 @@ const EMPTY_AGENT = {
 export default function Agents() {
   const [search, setSearch]     = useState('')
   const [filter, setFilter]     = useState('all')
+  const [page, setPage]         = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm]           = useState({ ...EMPTY_AGENT })
   const [saving, setSaving]       = useState(false)
@@ -77,6 +82,7 @@ export default function Agents() {
 
   const set = (k: keyof typeof EMPTY_AGENT) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }))
+  const setVal = (k: keyof typeof EMPTY_AGENT) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -154,6 +160,13 @@ export default function Agents() {
     return matchSearch && matchFilter
   })
 
+  const paginated = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filtered.slice(start, start + pageSize)
+  }, [filtered, page, pageSize])
+
+  const goToPage = (p: number) => setPage(Math.max(1, Math.min(p, Math.ceil(filtered.length / pageSize))))
+
   const KPI_ITEMS = [
     { key: 'all',      label: 'Total agents',  count: all.length },
     { key: 'EN_POSTE', label: 'En poste',      count: all.filter(a => a.status === 'EN_POSTE').length },
@@ -168,15 +181,25 @@ export default function Agents() {
     <div className="space-y-5">
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {KPI_ITEMS.map(s => (
-          <button key={s.key} onClick={() => setFilter(s.key)}
-            className={`bg-white rounded-xl p-4 border text-left transition-all ${filter === s.key ? 'border-sagard-yellow shadow-md' : 'border-slate-200 hover:border-slate-300'}`}>
-            {loading
-              ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
-              : <p className="text-2xl font-black text-slate-800">{s.count}</p>}
-            <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
-          </button>
-        ))}
+        {KPI_ITEMS.map((s, i) => {
+          const iconMap: any[] = [Users, ShieldCheck, GraduationCap, Plane]
+          const pastelMap: string[] = ['bg-slate-100 text-slate-600', 'bg-green-50 text-green-600', 'bg-amber-50 text-amber-600', 'bg-blue-50 text-blue-600']
+          const Icon = iconMap[i] ?? Users
+          return (
+            <button key={s.key} onClick={() => setFilter(s.key)}
+              className={`bg-white rounded-xl p-4 border text-left transition-all flex items-center gap-3 ${filter === s.key ? 'border-sagard-yellow shadow-md' : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'}`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${pastelMap[i] ?? 'bg-slate-100 text-slate-600'}`}>
+                <Icon size={18} />
+              </div>
+              <div>
+                {loading
+                  ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
+                  : <p className="text-2xl font-black text-slate-800">{s.count}</p>}
+                <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
+              </div>
+            </button>
+          )
+        })}
       </div>
 
       {/* Table */}
@@ -199,21 +222,21 @@ export default function Agents() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  {['Agent','Matricule','Poste','Site affecté','Vacation','Contrat','Embauche','Statut'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                  {['Agent','Matricule','Poste','Site affecté','Vacation','Contrat','Embauche','Statut'].map((h, i) => (
+                    <th key={h} className={`text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50 ${i === 2 || i === 3 || i === 4 || i === 5 || i === 6 ? 'hidden md:table-cell' : ''}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filtered.map(agent => {
+                {paginated.map(agent => {
                   const u         = agent.user ?? {}
                   const initials  = (u.firstName?.[0] ?? '') + (u.lastName?.[0] ?? '')
                   const colorIdx  = ((u.firstName?.charCodeAt(0) ?? 0) + (u.lastName?.charCodeAt(0) ?? 0)) % COLORS.length
                   const st        = STATUS_CFG[agent.status] ?? { label: agent.status, cls: 'bg-slate-100 text-slate-500' }
                   const shiftCfg  = SHIFT_CFG[agent.shift]   ?? { label: agent.shift ?? '—', cls: 'bg-slate-100 text-slate-600' }
-                  const siteName  = agent.deployments?.find((d: any) => d.isActive)?.site?.name
+                  const siteName  = agent.deployments?.[0]?.site?.name
                   const beh       = BEHAVIOR_CFG[agent.behaviorRating] ?? BEHAVIOR_CFG.NORMAL
                   const BehIcon   = beh.icon
 
@@ -234,17 +257,17 @@ export default function Agents() {
                         </div>
                       </td>
                       <td className="px-4 py-3 font-mono text-xs text-slate-600">{agent.matricule ?? '—'}</td>
-                      <td className="px-4 py-3 text-xs text-slate-600">{agent.position ?? '—'}</td>
-                      <td className="px-4 py-3 text-xs">
+                      <td className="px-4 py-3 text-xs text-slate-600 hidden md:table-cell">{agent.position ?? '—'}</td>
+                      <td className="px-4 py-3 text-xs hidden md:table-cell">
                         {siteName
                           ? <span className="text-slate-700">{siteName}</span>
                           : <span className="text-slate-400 italic">Non affecté</span>}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 hidden md:table-cell">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${shiftCfg.cls}`}>{shiftCfg.label}</span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-600">{agent.contractType ?? '—'}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{agent.hireDate ? fmtDate(agent.hireDate) : '—'}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600 hidden md:table-cell">{agent.contractType ?? '—'}</td>
+                      <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{agent.hireDate ? fmtDate(agent.hireDate) : '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${st.cls}`}>{st.label}</span>
                       </td>
@@ -260,6 +283,9 @@ export default function Agents() {
               </div>
             )}
           </div>
+        )}
+        {filtered.length > 0 && (
+          <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={goToPage} onPageSizeChange={s => { setPageSize(s); setPage(1) }} />
         )}
       </div>
     </div>
@@ -277,7 +303,8 @@ export default function Agents() {
             </button>
           </div>
 
-          <form onSubmit={handleCreate} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          <form onSubmit={handleCreate} className="flex-1 overflow-y-auto">
+            <div className="px-6 py-5 space-y-5">
             {/* Toggle mode */}
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Type d'enregistrement</p>
@@ -297,12 +324,9 @@ export default function Agents() {
             {createMode === 'existing' && (
               <div>
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Rattachement utilisateur</p>
-                <select value={form.userId} onChange={set('userId')} className={inputCls + ' bg-white'}>
-                  <option value="">-- Sélectionner un utilisateur --</option>
-                  {users.filter((u: any) => !u.agent).map((u: any) => (
-                    <option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.role})</option>
-                  ))}
-                </select>
+                <Select value={form.userId} onChange={setVal('userId')}
+                  options={users.filter((u: any) => !u.agent).map((u: any) => ({ value: u.id, label: `${u.firstName} ${u.lastName} (${u.role})` }))}
+                  placeholder="-- Sélectionner un utilisateur --" className="w-full" />
               </div>
             )}
 
@@ -310,7 +334,7 @@ export default function Agents() {
             {createMode === 'new' && (
               <div>
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Identité & compte</p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">Prénom *</label>
                     <input value={form.firstName} onChange={set('firstName')} className={inputCls} placeholder="Kouadio" />
@@ -333,16 +357,8 @@ export default function Agents() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">Rôle</label>
-                    <select value={form.role} onChange={set('role')} className={inputCls + ' bg-white'}>
-                      <option value="AGENT_TERRAIN">Agent terrain</option>
-                      <option value="CONTROLEUR">Contrôleur</option>
-                      <option value="TECHNICIENNE_SURFACE">Technicienne de surface</option>
-                      <option value="AGENT_ACCUEIL">Agent d'accueil</option>
-                      <option value="CHEF_OPERATIONS">Chef opérations</option>
-                      <option value="RH">RH</option>
-                      <option value="COMMERCIAL">Commercial</option>
-                      <option value="COMPTABLE">Comptable</option>
-                    </select>
+                    <Select value={form.role} onChange={setVal('role')}
+                      options={[{ value: 'AGENT_TERRAIN', label: 'Agent terrain' }, { value: 'CONTROLEUR', label: 'Contrôleur' }, { value: 'TECHNICIENNE_SURFACE', label: 'Technicienne de surface' }, { value: 'AGENT_ACCUEIL', label: "Agent d'accueil" }, { value: 'CHEF_OPERATIONS', label: 'Chef opérations' }, { value: 'RH', label: 'RH' }, { value: 'COMMERCIAL', label: 'Commercial' }, { value: 'COMPTABLE', label: 'Comptable' }]} className="w-full" />
                   </div>
                 </div>
               </div>
@@ -351,7 +367,7 @@ export default function Agents() {
             {/* Identité */}
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Informations employé</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">N° CNI</label>
                   <input value={form.cniNumber} onChange={set('cniNumber')} className={inputCls} placeholder="CI-XXXXXXXXX" />
@@ -362,15 +378,14 @@ export default function Agents() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Niveau d'étude</label>
-                  <select value={form.educationLevel} onChange={set('educationLevel')} className={inputCls + ' bg-white'}>
-                    {EDUCATION_LEVELS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
-                  </select>
+                  <Select value={form.educationLevel} onChange={setVal('educationLevel')}
+                    options={EDUCATION_LEVELS.map(l => ({ value: l.value, label: l.label }))} className="w-full" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Service / Département</label>
                   <input value={form.department} onChange={set('department')} className={inputCls} placeholder="Opérations, Commercial..." />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Poste *</label>
                   <input value={form.position} onChange={set('position')} required className={inputCls} placeholder="Agent de sécurité, Chef de poste..." />
                 </div>
@@ -380,30 +395,26 @@ export default function Agents() {
             {/* Contrat de travail */}
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Contrat de travail</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Type de contrat</label>
-                  <select value={form.contractType} onChange={set('contractType')} className={inputCls + ' bg-white'}>
-                    {CONTRACT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
+                  <Select value={form.contractType} onChange={setVal('contractType')}
+                    options={CONTRACT_TYPES.map(t => ({ value: t.value, label: t.label }))} className="w-full" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Vacation</label>
-                  <select value={form.shift} onChange={set('shift')} className={inputCls + ' bg-white'}>
-                    <option value="JOUR">Jour</option>
-                    <option value="NUIT">Nuit</option>
-                    <option value="MIXTE">Mixte</option>
-                  </select>
+                  <Select value={form.shift} onChange={setVal('shift')}
+                    options={[{ value: 'JOUR', label: 'Jour' }, { value: 'NUIT', label: 'Nuit' }, { value: 'MIXTE', label: 'Mixte' }]} className="w-full" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Date d'embauche</label>
-                  <input value={form.hireDate} onChange={set('hireDate')} type="date" className={inputCls} />
+                  <DatePicker value={form.hireDate} onChange={setVal('hireDate')} className="w-full" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Fin de contrat</label>
-                  <input value={form.contractEndDate} onChange={set('contractEndDate')} type="date" className={inputCls} />
+                  <DatePicker value={form.contractEndDate} onChange={setVal('contractEndDate')} className="w-full" />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Salaire de base (XOF)</label>
                   <input value={form.baseSalary} onChange={set('baseSalary')} type="number" className={inputCls} placeholder="150000" />
                 </div>
@@ -413,8 +424,8 @@ export default function Agents() {
             {/* Contact d'urgence */}
             <div>
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Contact d'urgence</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Nom et prénom</label>
                   <input value={form.emergencyContact} onChange={set('emergencyContact')} className={inputCls} placeholder="KONAN Amani" />
                 </div>
@@ -432,8 +443,9 @@ export default function Agents() {
             {formError && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{formError}</div>
             )}
+            </div>
 
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
               <button type="button" onClick={() => setShowModal(false)}
                 className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 bg-white transition-colors">
                 Annuler

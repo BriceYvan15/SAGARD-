@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { createCandidacy } from '../services/hr.service'
+import Select from './Select'
+import DatePicker from './DatePicker'
 
 const POSITIONS = [
   'Agent de sécurité',
@@ -132,9 +134,8 @@ export default function NewPostulantModal({ onClose, onCreated }: Props) {
                   <input value={form.cniNumber} onChange={e => set('cniNumber', e.target.value)} className="input-field" placeholder="N° pièce d'identité" />
                 </Field>
                 <Field label="Poste souhaité">
-                  <select value={form.position} onChange={e => set('position', e.target.value)} className="input-field">
-                    {POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
+                  <Select value={form.position} onChange={v => set('position', v)}
+                    options={POSITIONS.map(p => ({ value: p, label: p }))} className="w-full" />
                 </Field>
               </div>
             </>
@@ -146,15 +147,14 @@ export default function NewPostulantModal({ onClose, onCreated }: Props) {
                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">État civil</h3>
                 <div className="grid grid-cols-3 gap-3">
                   <Field label="Date de naissance">
-                    <input type="date" value={cv.dateNaissance} onChange={e => setCvField('dateNaissance', e.target.value)} className="input-field" />
+                    <DatePicker value={cv.dateNaissance} onChange={v => setCvField('dateNaissance', v)} className="w-full" />
                   </Field>
                   <Field label="Lieu de naissance">
                     <input value={cv.lieuNaissance} onChange={e => setCvField('lieuNaissance', e.target.value)} className="input-field" placeholder="Ville / Pays" />
                   </Field>
                   <Field label="Situation matrimoniale">
-                    <select value={cv.situationMatrimoniale} onChange={e => setCvField('situationMatrimoniale', e.target.value)} className="input-field">
-                      {SITUATIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    <Select value={cv.situationMatrimoniale} onChange={v => setCvField('situationMatrimoniale', v)}
+                      options={SITUATIONS.map(s => ({ value: s, label: s }))} className="w-full" />
                   </Field>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -171,9 +171,8 @@ export default function NewPostulantModal({ onClose, onCreated }: Props) {
                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">Formation & Diplômes</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Niveau d'étude">
-                    <select value={cv.niveauEtude} onChange={e => setCvField('niveauEtude', e.target.value)} className="input-field">
-                      {NIVEAUX_ETUDE.map(n => <option key={n} value={n}>{n}</option>)}
-                    </select>
+                    <Select value={cv.niveauEtude} onChange={v => setCvField('niveauEtude', v)}
+                      options={NIVEAUX_ETUDE.map(n => ({ value: n, label: n }))} className="w-full" />
                   </Field>
                   <Field label="Diplôme obtenu">
                     <input value={cv.diplome} onChange={e => setCvField('diplome', e.target.value)} className="input-field" placeholder="Ex: BEPC, CAP Sécurité..." />
@@ -213,21 +212,12 @@ export default function NewPostulantModal({ onClose, onCreated }: Props) {
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <Field label="Permis de conduire">
-                    <select value={cv.permisConduire} onChange={e => setCvField('permisConduire', e.target.value)} className="input-field">
-                      <option value="Non">Non</option>
-                      <option value="A">Catégorie A (moto)</option>
-                      <option value="B">Catégorie B (voiture)</option>
-                      <option value="C">Catégorie C (poids lourd)</option>
-                      <option value="AB">A + B</option>
-                    </select>
+                    <Select value={cv.permisConduire} onChange={v => setCvField('permisConduire', v)}
+                      options={[{ value: 'Non', label: 'Non' }, { value: 'A', label: 'Catégorie A (moto)' }, { value: 'B', label: 'Catégorie B (voiture)' }, { value: 'C', label: 'Catégorie C (poids lourd)' }, { value: 'AB', label: 'A + B' }]} className="w-full" />
                   </Field>
                   <Field label="Disponibilité">
-                    <select value={cv.disponibilite} onChange={e => setCvField('disponibilite', e.target.value)} className="input-field">
-                      <option value="Immédiate">Immédiate</option>
-                      <option value="1 semaine">Dans 1 semaine</option>
-                      <option value="2 semaines">Dans 2 semaines</option>
-                      <option value="1 mois">Dans 1 mois</option>
-                    </select>
+                    <Select value={cv.disponibilite} onChange={v => setCvField('disponibilite', v)}
+                      options={[{ value: 'Immédiate', label: 'Immédiate' }, { value: '1 semaine', label: 'Dans 1 semaine' }, { value: '2 semaines', label: 'Dans 2 semaines' }, { value: '1 mois', label: 'Dans 1 mois' }]} className="w-full" />
                   </Field>
                   <Field label="Prétention salariale">
                     <input value={cv.pretentionSalariale} onChange={e => setCvField('pretentionSalariale', e.target.value)} className="input-field" placeholder="Ex: 100 000 FCFA" />

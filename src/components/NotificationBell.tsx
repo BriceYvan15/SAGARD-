@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, CheckCheck, Target, Users, FileText, AlertTriangle, Clock, X, UserPlus, Shield, Package, Briefcase } from 'lucide-react'
+import { Bell, CheckCheck, Target, Users, FileText, AlertTriangle, Clock, X, UserPlus, Shield, Package, Briefcase, Volume2, VolumeX } from 'lucide-react'
 import { getNotifications, getUnreadCount, markRead, markAllRead } from '../services/notifications.service'
+import { unlockAudio, playNotificationSound, isSoundEnabled, setSoundEnabled } from '../lib/notification-sound'
 
 const ICON_MAP: Record<string, any> = {
   PROSPECT: Target,
@@ -63,13 +64,39 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
   const [unread, setUnread] = useState(0)
+  const [soundOn, setSoundOn] = useState(isSoundEnabled())
   const ref = useRef<HTMLDivElement>(null)
+  const prevUnreadRef = useRef(0)
+  const prevNotifIdsRef = useRef<Set<string>>(new Set())
+  const isFirstLoadRef = useRef(true)
 
   const load = async () => {
     try {
       const [notifs, count] = await Promise.all([getNotifications(), getUnreadCount()])
+      const newUnread = typeof count === 'number' ? count : count?.count ?? 0
+
+      // Detect new notifications (by ID) to play sound
+      if (isFirstLoadRef.current) {
+        prevNotifIdsRef.current = new Set(notifs.map((n: any) => n.id as string))
+        prevUnreadRef.current = newUnread
+        isFirstLoadRef.current = false
+      } else {
+        const currentIds = new Set(notifs.map((n: any) => n.id as string))
+        const newNotifs = notifs.filter((n: any) => !prevNotifIdsRef.current.has(n.id))
+        if (newNotifs.length > 0 && soundOn) {
+          // Play sound based on the most urgent new notification type
+          const types = newNotifs.map((n: any) => n.type as string)
+          const priorityType = types.find((t: string) => ['INCIDENT', 'ALERTE', 'RECLAMATION'].includes(t))
+            || types.find((t: string) => ['FACTURE', 'FACTURE_RETARD', 'COMMERCIAL'].includes(t))
+            || types[0]
+          playNotificationSound(priorityType)
+        }
+        prevNotifIdsRef.current = currentIds
+        prevUnreadRef.current = newUnread
+      }
+
       setNotifications(notifs)
-      setUnread(typeof count === 'number' ? count : count?.count ?? 0)
+      setUnread(newUnread)
     } catch {}
   }
 
@@ -77,6 +104,21 @@ export default function NotificationBell() {
     load()
     const interval = setInterval(load, 30000)
     return () => clearInterval(interval)
+  }, [soundOn])
+
+  // Unlock audio on first user interaction anywhere
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      unlockAudio()
+      document.removeEventListener('click', handleFirstInteraction)
+      document.removeEventListener('keydown', handleFirstInteraction)
+    }
+    document.addEventListener('click', handleFirstInteraction)
+    document.addEventListener('keydown', handleFirstInteraction)
+    return () => {
+      document.removeEventListener('click', handleFirstInteraction)
+      document.removeEventListener('keydown', handleFirstInteraction)
+    }
   }, [])
 
   useEffect(() => {
@@ -120,8 +162,21 @@ export default function NotificationBell() {
     return `il y a ${days}j`
   }
 
+  const toggleSound = () => {
+    const next = !soundOn
+    setSoundOn(next)
+    setSoundEnabled(next)
+    if (next) {
+      unlockAudio()
+      playNotificationSound('SYSTEME')
+    }
+  }
+
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative flex items-center gap-1">
+      <button onClick={toggleSound} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors" title={soundOn ? 'Désactiver le son' : 'Activer le son'}>
+        {soundOn ? <Volume2 size={18} /> : <VolumeX size={18} />}
+      </button>
       <button onClick={() => setOpen(!open)} className="relative p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors">
         <Bell size={20} />
         {unread > 0 && (

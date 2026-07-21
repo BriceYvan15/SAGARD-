@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Loader2, Eye, EyeOff, UserCheck } from 'lucide-react'
 import { convertCandidacyToAgent } from '../services/hr.service'
+import Select from './Select'
+import DatePicker from './DatePicker'
 
 const ROLES = [
   { value: 'AGENT_TERRAIN', label: 'Agent de terrain' },
@@ -178,9 +180,8 @@ export default function ConvertToAgentModal({ candidacy, onClose, onCreated }: P
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Rôle système *</label>
-                <select value={form.role} onChange={e => set('role', e.target.value)} className="input-field">
-                  {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                </select>
+                <Select value={form.role} onChange={v => set('role', v)}
+                  options={ROLES.map(r => ({ value: r.value, label: r.label }))} className="w-full" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Poste / Fonction *</label>
@@ -192,15 +193,13 @@ export default function ConvertToAgentModal({ candidacy, onClose, onCreated }: P
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Shift</label>
-                <select value={form.shift} onChange={e => set('shift', e.target.value)} className="input-field">
-                  {SHIFTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                </select>
+                <Select value={form.shift} onChange={v => set('shift', v)}
+                  options={SHIFTS.map(s => ({ value: s.value, label: s.label }))} className="w-full" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Type de contrat *</label>
-                <select value={form.contractType} onChange={e => set('contractType', e.target.value)} className="input-field">
-                  {CONTRACTS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
+                <Select value={form.contractType} onChange={v => set('contractType', v)}
+                  options={CONTRACTS.map(c => ({ value: c.value, label: c.label }))} className="w-full" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Salaire de base (FCFA) *</label>
@@ -208,11 +207,11 @@ export default function ConvertToAgentModal({ candidacy, onClose, onCreated }: P
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Date d'embauche *</label>
-                <input type="date" value={form.hireDate} onChange={e => set('hireDate', e.target.value)} className="input-field" />
+                <DatePicker value={form.hireDate} onChange={v => set('hireDate', v)} className="w-full" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Fin de contrat (si CDD/Essai)</label>
-                <input type="date" value={form.contractEndDate} onChange={e => set('contractEndDate', e.target.value)} className="input-field" />
+                <DatePicker value={form.contractEndDate} onChange={v => set('contractEndDate', v)} className="w-full" />
               </div>
             </div>
           </section>
@@ -223,9 +222,8 @@ export default function ConvertToAgentModal({ candidacy, onClose, onCreated }: P
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Niveau d'étude</label>
-                <select value={form.educationLevel} onChange={e => set('educationLevel', e.target.value)} className="input-field">
-                  {EDUCATION_LEVELS.map(n => <option key={n} value={n}>{n}</option>)}
-                </select>
+                <Select value={form.educationLevel} onChange={v => set('educationLevel', v)}
+                  options={EDUCATION_LEVELS.map(n => ({ value: n, label: n }))} className="w-full" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Compte bancaire (RIB)</label>

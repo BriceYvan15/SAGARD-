@@ -73,10 +73,10 @@ export default function AlertesCommerciales() {
       )}
 
       {/* KPIs */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 mb-1">
-            <Target size={16} className="text-blue-500" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center"><Target size={16} className="text-blue-600" /></div>
             <p className="text-xs text-slate-500 font-medium">Objectif semaine</p>
           </div>
           <p className="text-2xl font-black text-slate-800">{totalWeek} <span className="text-sm font-medium text-slate-400">/ 10</span></p>
@@ -84,25 +84,25 @@ export default function AlertesCommerciales() {
             <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, totalWeek * 10)}%`, backgroundColor: totalWeek >= 10 ? '#22c55e' : '#f59e0b' }} />
           </div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 mb-1">
-            <FileWarning size={16} className="text-amber-500" />
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center"><FileWarning size={16} className="text-amber-600" /></div>
             <p className="text-xs text-slate-500 font-medium">Prospects stagnants</p>
           </div>
           <p className="text-2xl font-black text-amber-600">{staleProspects.length}</p>
           <p className="text-[10px] text-slate-400 mt-1">Non avancés depuis +30j</p>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 mb-1">
-            <AlertTriangle size={16} className="text-red-500" />
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center"><AlertTriangle size={16} className="text-red-600" /></div>
             <p className="text-xs text-slate-500 font-medium">Factures en retard</p>
           </div>
           <p className="text-2xl font-black text-red-600">{overdueInvoices.length}</p>
           <p className="text-[10px] text-slate-400 mt-1">Échéance dépassée</p>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 mb-1">
-            <Trophy size={16} className="text-green-500" />
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center"><Trophy size={16} className="text-green-600" /></div>
             <p className="text-xs text-slate-500 font-medium">Meilleur commercial</p>
           </div>
           <p className="text-lg font-black text-green-600 truncate">{ranking.length > 0 ? ranking[0].userName : '—'}</p>
@@ -111,7 +111,7 @@ export default function AlertesCommerciales() {
       </div>
 
       {/* Two columns */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Ranking commerciaux */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
           <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">

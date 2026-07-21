@@ -11,6 +11,11 @@ export const createDeployment   = (d: any) => api.post('/deployments', d).then(r
 export const activateDeployment = (id: string) => api.post(`/deployments/${id}/activate`).then(r => r.data)
 export const endDeployment      = (id: string) => api.post(`/deployments/${id}/end`).then(r => r.data)
 export const replaceDeployment  = (id: string, d: any) => api.post(`/deployments/${id}/replace`, d).then(r => r.data)
+export const transferDeployment = (id: string, d: any) => api.post(`/deployments/${id}/transfer`, d).then(r => r.data)
+
+// Mutations / Transferts
+export const getTransfers       = (p?: any) => api.get('/transfers', { params: p }).then(r => r.data)
+export const getAgentTransfers  = (agentId: string) => api.get(`/transfers/agent/${agentId}`).then(r => r.data)
 
 // Incidents
 export const getIncidents       = (p?: any) => api.get('/incidents', { params: p }).then(r => r.data)

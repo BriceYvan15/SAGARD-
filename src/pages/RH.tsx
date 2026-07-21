@@ -1,12 +1,14 @@
 import { Fragment, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Users, DollarSign, Calendar, AlertTriangle, CheckCircle, Clock, Loader2, Plus, X, Award, UserPlus, FileText, Eye, Briefcase } from 'lucide-react'
+import { Users, DollarSign, Calendar, AlertTriangle, CheckCircle, Clock, Loader2, Plus, X, Award, UserPlus, FileText, Eye, Briefcase, Ban, Pencil, ShieldOff, ShieldCheck, Search, Trash2 } from 'lucide-react'
 import { useApi } from '../lib/useApi'
-import { getPayrolls, generatePayroll, approvePayroll, markPayrollPaid, getPayslip, getLeaves, createLeave, approveLeave, rejectLeave, getTrainings, createTraining, getCandidacies, createCandidacy, updateIntegrationStep, getContractExpiryAlerts, getIndisciplinedAgents, getDisciplinary, createDisciplinary, getContracts } from '../services/hr.service'
+import { getPayrolls, generatePayroll, approvePayroll, markPayrollPaid, deletePayroll, getPayslip, getPayrollDetail, updatePayrollLine, toggleBlockPayrollLine, getLeaves, createLeave, approveLeave, rejectLeave, getTrainings, createTraining, getCandidacies, createCandidacy, updateIntegrationStep, getContractExpiryAlerts, getIndisciplinedAgents, getDisciplinary, createDisciplinary, getContracts } from '../services/hr.service'
 import { getAgents } from '../services/agents.service'
 import { fmt, fmtDate } from '../lib/utils'
 import NewPostulantModal from '../components/NewPostulantModal'
 import ConvertToAgentModal from '../components/ConvertToAgentModal'
+import Select from '../components/Select'
+import DatePicker from '../components/DatePicker'
 
 const STATUS_PAYROLL: Record<string, { label: string; cls: string }> = {
   BROUILLON: { label: 'Brouillon',  cls: 'bg-slate-100 text-slate-600' },
@@ -69,6 +71,25 @@ export default function RH() {
   const [payslipLoading, setPayslipLoading] = useState(false)
   // Expandable payroll detail
   const [expandedPayroll, setExpandedPayroll] = useState<string | null>(null)
+  const [payrollDetail, setPayrollDetail] = useState<any | null>(null)
+  const [payrollDetailLoading, setPayrollDetailLoading] = useState(false)
+  // Edit line modal
+  const [editLine, setEditLine] = useState<any | null>(null)
+  const [editForm, setEditForm] = useState({ daysWorked: 26, baseSalary: 0, bonuses: 0, deductions: 0, notes: '' })
+  const [editSaving, setEditSaving] = useState(false)
+  // Block modal
+  const [blockLine, setBlockLine] = useState<any | null>(null)
+  const [blockReason, setBlockReason] = useState('')
+  const [blockSaving, setBlockSaving] = useState(false)
+  // Search in payroll
+  const [payrollSearch, setPayrollSearch] = useState('')
+  // Delete payroll modal
+  const [deletePayrollItem, setDeletePayrollItem] = useState<any | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  // Generate payroll modal
+  const [showGenModal, setShowGenModal] = useState(false)
+  const [selectedAgentIds, setSelectedAgentIds] = useState<Set<string>>(new Set())
+  const [genSearch, setGenSearch] = useState('')
 
   const { data: payrolls, loading: pLoad, reload: reloadP }   = useApi(getPayrolls)
   const { data: leaves,   loading: lLoad, reload: reloadL }   = useApi(getLeaves)
@@ -85,9 +106,17 @@ export default function RH() {
   const now = new Date()
 
   async function handleGenerate() {
+    const activeAgents = agents.filter((a: any) => a.status === 'EN_POSTE')
+    setSelectedAgentIds(new Set(activeAgents.map((a: any) => a.id)))
+    setShowGenModal(true)
+  }
+
+  async function handleGenerateSelected() {
     setGenLoading(true)
     try {
-      await generatePayroll(now.getMonth() + 1, now.getFullYear())
+      const ids = Array.from(selectedAgentIds)
+      await generatePayroll(now.getMonth() + 1, now.getFullYear(), ids.length > 0 ? ids : undefined)
+      setShowGenModal(false)
       reloadP()
     } catch (e: any) {
       alert(e.response?.data?.message ?? 'Erreur génération')
@@ -99,6 +128,80 @@ export default function RH() {
     try { await approvePayroll(id); reloadP() }
     catch (e: any) { alert(e.response?.data?.message ?? 'Erreur') }
     finally { setAction(null) }
+  }
+
+  async function handleExpandPayroll(p: any) {
+    const isExpanded = expandedPayroll === p.id
+    if (isExpanded) {
+      setExpandedPayroll(null)
+      setPayrollDetail(null)
+    } else {
+      setExpandedPayroll(p.id)
+      setPayrollDetailLoading(true)
+      try {
+        const detail = await getPayrollDetail(p.id)
+        setPayrollDetail(detail)
+      } catch { alert('Erreur chargement détail') }
+      finally { setPayrollDetailLoading(false) }
+    }
+  }
+
+  function openEditLine(line: any) {
+    setEditLine(line)
+    setEditForm({
+      daysWorked: line.daysWorked,
+      baseSalary: Number(line.baseSalary),
+      bonuses: Number(line.bonuses),
+      deductions: Number(line.deductions),
+      notes: line.notes ?? '',
+    })
+  }
+
+  async function handleSaveLine() {
+    if (!editLine) return
+    setEditSaving(true)
+    try {
+      await updatePayrollLine(editLine.id, editForm)
+      if (expandedPayroll) {
+        const detail = await getPayrollDetail(expandedPayroll)
+        setPayrollDetail(detail)
+      }
+      reloadP()
+      setEditLine(null)
+    } catch (e: any) {
+      alert(e.response?.data?.message ?? 'Erreur')
+    } finally { setEditSaving(false) }
+  }
+
+  async function handleToggleBlock() {
+    if (!blockLine) return
+    setBlockSaving(true)
+    try {
+      await toggleBlockPayrollLine(blockLine.id, !blockLine.blocked, blockReason || undefined)
+      if (expandedPayroll) {
+        const detail = await getPayrollDetail(expandedPayroll)
+        setPayrollDetail(detail)
+      }
+      reloadP()
+      setBlockLine(null)
+      setBlockReason('')
+    } catch (e: any) {
+      alert(e.response?.data?.message ?? 'Erreur')
+    } finally { setBlockSaving(false) }
+  }
+
+  async function handleDeletePayroll() {
+    if (!deletePayrollItem) return
+    setDeleteLoading(true)
+    try {
+      await deletePayroll(deletePayrollItem.id)
+      setExpandedPayroll(null)
+      setPayrollDetail(null)
+      reloadP()
+      setDeletePayrollItem(null)
+    } catch (e: any) {
+      alert(e.response?.data?.message ?? 'Erreur')
+    } finally { setDeleteLoading(false) }
   }
 
   async function handleLeaveAction(id: string, action: 'approve' | 'reject') {
@@ -115,7 +218,7 @@ export default function RH() {
     <Fragment>
     <div className="space-y-5">
       {/* Tabs */}
-      <div className="bg-white rounded-xl border border-slate-200 p-1.5 flex gap-1 w-fit flex-wrap">
+      <div className="bg-white rounded-xl border border-slate-200 p-1.5 flex gap-1 w-fit flex-wrap shadow-sm">
         <Tab active={tab === 'payroll'}      onClick={() => setTab('payroll')}>💰 Paie</Tab>
         <Tab active={tab === 'contracts'}    onClick={() => setTab('contracts')}>📋 Contrats</Tab>
         <Tab active={tab === 'leaves'}       onClick={() => setTab('leaves')}>🏖️ Congés</Tab>
@@ -129,7 +232,7 @@ export default function RH() {
       {tab === 'payroll' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-slate-800">Fiches de paie</h2>
+            <h2 className="font-semibold text-slate-800">Gestion de la paie</h2>
             <button onClick={handleGenerate} disabled={genLoading}
               className="flex items-center gap-2 bg-sagard-yellow hover:bg-sagard-yellow-dark text-sagard-dark text-sm font-bold px-4 py-2 rounded-xl transition-colors disabled:opacity-60">
               {genLoading ? <Loader2 size={16} className="animate-spin" /> : <DollarSign size={16} />}
@@ -144,14 +247,23 @@ export default function RH() {
               {((payrolls as any[]) ?? []).map((p: any) => {
                 const st = STATUS_PAYROLL[p.status] ?? { label: p.status, cls: 'bg-slate-100 text-slate-600' }
                 const isExpanded = expandedPayroll === p.id
+                const lines = payrollDetail?.lines ?? p.lines ?? []
+                const filteredLines = payrollSearch
+                  ? lines.filter((l: any) => {
+                      const name = `${l.agent?.user?.firstName ?? ''} ${l.agent?.user?.lastName ?? ''}`.toLowerCase()
+                      const mat = (l.agent?.matricule ?? '').toLowerCase()
+                      return name.includes(payrollSearch.toLowerCase()) || mat.includes(payrollSearch.toLowerCase())
+                    })
+                  : lines
+                const blockedCount = lines.filter((l: any) => l.blocked).length
                 return (
                   <div key={p.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                    <div className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-slate-50" onClick={() => setExpandedPayroll(isExpanded ? null : p.id)}>
+                    <div className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-slate-50" onClick={() => handleExpandPayroll(p)}>
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 bg-sagard-yellow/20 rounded-lg flex items-center justify-center"><DollarSign size={18} className="text-sagard-yellow-dark" /></div>
                         <div>
                           <p className="font-bold text-slate-800">{String(p.month).padStart(2,'0')}/{p.year}</p>
-                          <p className="text-xs text-slate-400">{p.lines?.length ?? 0} agents</p>
+                          <p className="text-xs text-slate-400">{p.lines?.length ?? 0} agents{blockedCount > 0 && <span className="text-red-500 font-medium"> · {blockedCount} bloqué(s)</span>}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-6">
@@ -166,16 +278,28 @@ export default function RH() {
                         <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${st.cls}`}>{st.label}</span>
                         <div className="flex gap-2">
                           {p.status === 'BROUILLON' && (
-                            <button onClick={(e) => { e.stopPropagation(); handleApprovePayroll(p.id) }} disabled={actionLoading === p.id}
+                            <>
+                              <button onClick={(e) => { e.stopPropagation(); handleApprovePayroll(p.id) }} disabled={actionLoading === p.id}
                               className="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1">
                               {actionLoading === p.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />} Valider
                             </button>
+                            <button onClick={(e) => { e.stopPropagation(); setDeletePayrollItem(p) }} title="Supprimer"
+                              className="text-xs bg-red-50 text-red-600 hover:bg-red-100 px-2.5 py-1.5 rounded-lg font-medium flex items-center gap-1">
+                              <Trash2 size={12} />
+                            </button>
+                            </>
                           )}
                           {p.status === 'VALIDE' && (
+                            <>
                             <button onClick={async (e) => { e.stopPropagation(); setAction(p.id); try { await markPayrollPaid(p.id); reloadP() } catch {} finally { setAction(null) } }} disabled={actionLoading === p.id}
                               className="text-xs bg-green-50 text-green-700 hover:bg-green-100 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1">
                               {actionLoading === p.id ? <Loader2 size={12} className="animate-spin" /> : <DollarSign size={12} />} Marquer payé
                             </button>
+                            <button onClick={(e) => { e.stopPropagation(); setDeletePayrollItem(p) }} title="Supprimer"
+                              className="text-xs bg-red-50 text-red-600 hover:bg-red-100 px-2.5 py-1.5 rounded-lg font-medium flex items-center gap-1">
+                              <Trash2 size={12} />
+                            </button>
+                            </>
                           )}
                         </div>
                         <span className={`transition-transform text-slate-400 ${isExpanded ? 'rotate-180' : ''}`}>▼</span>
@@ -183,31 +307,95 @@ export default function RH() {
                     </div>
                     {isExpanded && (
                       <div className="border-t border-slate-100">
-                        <table className="w-full text-sm">
-                          <thead className="bg-slate-50"><tr>
-                            {['Agent','Salaire base','Primes','Brut','Retenues','Net','Fiche'].map(h => (
-                              <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase">{h}</th>
-                            ))}
-                          </tr></thead>
-                          <tbody className="divide-y divide-slate-50">
-                            {(p.lines ?? []).map((l: any) => (
-                              <tr key={l.id} className="hover:bg-slate-50">
-                                <td className="px-4 py-2.5 font-medium text-slate-800">{l.agent?.user?.firstName} {l.agent?.user?.lastName}</td>
-                                <td className="px-4 py-2.5 text-slate-600">{fmt(l.baseSalary)}</td>
-                                <td className="px-4 py-2.5 text-emerald-600 font-medium">+{fmt(l.bonuses)}</td>
-                                <td className="px-4 py-2.5 font-semibold text-slate-800">{fmt(l.grossSalary)}</td>
-                                <td className="px-4 py-2.5 text-red-600 font-medium">-{fmt(l.deductions)}</td>
-                                <td className="px-4 py-2.5 font-bold text-green-700">{fmt(l.netSalary)}</td>
-                                <td className="px-4 py-2.5">
-                                  <button onClick={async () => { setPayslipLoading(true); try { const data = await getPayslip(l.id); setPayslipData(data) } catch { alert('Erreur chargement fiche') } finally { setPayslipLoading(false) } }}
-                                    className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
-                                    <Eye size={12} /> Voir fiche
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                        {/* Search bar */}
+                        <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-3">
+                          <div className="relative flex-1 max-w-xs">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                              value={payrollSearch}
+                              onChange={e => setPayrollSearch(e.target.value)}
+                              placeholder="Rechercher un agent..."
+                              className="w-full pl-9 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/30"
+                            />
+                          </div>
+                          <span className="text-xs text-slate-400">{filteredLines.length} agent(s)</span>
+                        </div>
+                        {payrollDetailLoading ? (
+                          <div className="flex justify-center py-8"><Loader2 className="animate-spin text-slate-300" size={20} /></div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead className="bg-slate-50"><tr>
+                                {['Agent','Poste','Site','Jours','Salaire base','Primes','Brut','Retenues','Net','Actions'].map(h => (
+                                  <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase whitespace-nowrap">{h}</th>
+                                ))}
+                              </tr></thead>
+                              <tbody className="divide-y divide-slate-50">
+                                {filteredLines.map((l: any) => (
+                                  <tr key={l.id} className={`hover:bg-slate-50 ${l.blocked ? 'bg-red-50/50' : ''}`}>
+                                    <td className="px-3 py-2.5">
+                                      <div className="font-medium text-slate-800">{l.agent?.user?.firstName} {l.agent?.user?.lastName}</div>
+                                      <div className="text-xs text-slate-400 font-mono">{l.agent?.matricule}</div>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-xs text-slate-600">{l.agent?.position ?? '—'}</td>
+                                    <td className="px-3 py-2.5 text-xs text-slate-600">{l.agent?.deployments?.[0]?.site?.name ?? '—'}</td>
+                                    <td className="px-3 py-2.5 text-slate-600 text-center">{l.daysWorked}j</td>
+                                    <td className="px-3 py-2.5 text-slate-600">{fmt(l.baseSalary)}</td>
+                                    <td className="px-3 py-2.5 text-emerald-600 font-medium">{Number(l.bonuses) > 0 ? `+${fmt(l.bonuses)}` : '—'}</td>
+                                    <td className="px-3 py-2.5 font-semibold text-slate-800">{fmt(l.grossSalary)}</td>
+                                    <td className="px-3 py-2.5 text-red-600 font-medium">{Number(l.deductions) > 0 ? `-${fmt(l.deductions)}` : '—'}</td>
+                                    <td className="px-3 py-2.5">
+                                      {l.blocked ? (
+                                        <div>
+                                          <span className="font-bold text-red-600 line-through">{fmt(l.netSalary)}</span>
+                                          <div className="text-xs text-red-500 flex items-center gap-1 mt-0.5"><Ban size={10} /> {l.blockReason ?? 'Bloqué'}</div>
+                                        </div>
+                                      ) : (
+                                        <span className="font-bold text-green-700">{fmt(l.netSalary)}</span>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-2.5">
+                                      <div className="flex items-center gap-1">
+                                        {p.status === 'BROUILLON' && (
+                                          <>
+                                            <button onClick={() => openEditLine(l)} title="Modifier"
+                                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                                              <Pencil size={13} />
+                                            </button>
+                                            <button onClick={() => { setBlockLine(l); setBlockReason(l.blockReason ?? '') }} title={l.blocked ? 'Débloquer' : 'Bloquer'}
+                                              className={`p-1.5 rounded-lg transition-colors ${l.blocked ? 'hover:bg-green-50 text-green-600' : 'hover:bg-red-50 text-red-500'}`}>
+                                              {l.blocked ? <ShieldCheck size={13} /> : <ShieldOff size={13} />}
+                                            </button>
+                                          </>
+                                        )}
+                                        <button onClick={async () => { setPayslipLoading(true); try { const data = await getPayslip(l.id); setPayslipData(data) } catch { alert('Erreur chargement fiche') } finally { setPayslipLoading(false) } }}
+                                          className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors" title="Voir fiche">
+                                          <Eye size={13} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                                {filteredLines.length === 0 && (
+                                  <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-400 text-sm">Aucun agent trouvé</td></tr>
+                                )}
+                              </tbody>
+                              {filteredLines.length > 0 && (
+                                <tfoot className="bg-slate-50 border-t-2 border-slate-100">
+                                  <tr className="font-bold">
+                                    <td colSpan={4} className="px-3 py-3 text-slate-700">Total ({filteredLines.length} agents)</td>
+                                    <td className="px-3 py-3 text-slate-700">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.baseSalary), 0))}</td>
+                                    <td className="px-3 py-3 text-emerald-700">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.bonuses), 0))}</td>
+                                    <td className="px-3 py-3 text-slate-800">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.grossSalary), 0))}</td>
+                                    <td className="px-3 py-3 text-red-700">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.deductions), 0))}</td>
+                                    <td className="px-3 py-3 text-green-700">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.netSalary), 0))}</td>
+                                    <td></td>
+                                  </tr>
+                                </tfoot>
+                              )}
+                            </table>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -312,6 +500,7 @@ export default function RH() {
             <div className="flex justify-center py-12"><Loader2 className="animate-spin text-slate-400" /></div>
           ) : (
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
@@ -350,6 +539,7 @@ export default function RH() {
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>
@@ -370,7 +560,7 @@ export default function RH() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {((trainings as any[]) ?? []).map((t: any) => (
-                <div key={t.id} className="bg-white rounded-xl border border-slate-200 p-4">
+                <div key={t.id} className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md hover:-translate-y-0.5 transition-all">
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="font-semibold text-slate-800 text-sm">{t.title}</h3>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -414,7 +604,7 @@ export default function RH() {
           ) : (
             <div className="space-y-4">
               {((candidacies as any[]) ?? []).map((c: any) => (
-                <div key={c.id} className="bg-white rounded-xl border border-slate-200 p-5">
+                <div key={c.id} className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md hover:-translate-y-0.5 transition-all">
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h3 className="font-bold text-slate-800">{c.firstName} {c.lastName}</h3>
@@ -549,6 +739,7 @@ export default function RH() {
             <div className="flex justify-center py-12"><Loader2 className="animate-spin text-slate-400" /></div>
           ) : (
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
@@ -583,6 +774,7 @@ export default function RH() {
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>
@@ -722,27 +914,19 @@ export default function RH() {
           }} className="px-6 py-5 space-y-4">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Agent *</label>
-              <select value={discForm.agentId} onChange={e => setDiscForm(f => ({ ...f, agentId: e.target.value }))} required
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                <option value="">-- Sélectionner un agent --</option>
-                {agents.map((a: any) => <option key={a.id} value={a.id}>{a.user?.firstName} {a.user?.lastName} ({a.matricule})</option>)}
-              </select>
+              <Select value={discForm.agentId} onChange={v => setDiscForm(f => ({ ...f, agentId: v }))} required
+                options={agents.map((a: any) => ({ value: a.id, label: `${a.user?.firstName} ${a.user?.lastName} (${a.matricule})` }))}
+                placeholder="-- Sélectionner un agent --" className="w-full" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Type</label>
-                <select value={discForm.type} onChange={e => setDiscForm(f => ({ ...f, type: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                  <option value="FAUTE">Faute</option>
-                  <option value="AVERTISSEMENT">Avertissement</option>
-                  <option value="MISE_A_PIED">Mise à pied</option>
-                  <option value="LICENCIEMENT">Licenciement</option>
-                </select>
+                <Select value={discForm.type} onChange={v => setDiscForm(f => ({ ...f, type: v }))}
+                  options={[{ value: 'FAUTE', label: 'Faute' }, { value: 'AVERTISSEMENT', label: 'Avertissement' }, { value: 'MISE_A_PIED', label: 'Mise à pied' }, { value: 'LICENCIEMENT', label: 'Licenciement' }]} className="w-full" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Date *</label>
-                <input value={discForm.date} onChange={e => setDiscForm(f => ({ ...f, date: e.target.value }))} type="date" required
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                <DatePicker value={discForm.date} onChange={v => setDiscForm(f => ({ ...f, date: v }))} className="w-full" />
               </div>
             </div>
             <div>
@@ -789,34 +973,23 @@ export default function RH() {
             {formError && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{formError}</div>}
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Agent *</label>
-              <select value={leaveForm.agentId} onChange={e => setLeaveForm(f => ({ ...f, agentId: e.target.value }))} required
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                <option value="">-- Sélectionner un agent --</option>
-                {agents.map((a: any) => <option key={a.id} value={a.id}>{a.user?.firstName} {a.user?.lastName} ({a.matricule})</option>)}
-              </select>
+              <Select value={leaveForm.agentId} onChange={v => setLeaveForm(f => ({ ...f, agentId: v }))} required
+                options={agents.map((a: any) => ({ value: a.id, label: `${a.user?.firstName} ${a.user?.lastName} (${a.matricule})` }))}
+                placeholder="-- Sélectionner un agent --" className="w-full" />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Type de congé</label>
-              <select value={leaveForm.type} onChange={e => setLeaveForm(f => ({ ...f, type: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                <option value="CONGE_ANNUEL">Congé annuel</option>
-                <option value="MALADIE">Maladie</option>
-                <option value="MATERNITE">Maternité</option>
-                <option value="PATERNITE">Paternité</option>
-                <option value="SANS_SOLDE">Sans solde</option>
-                <option value="FORMATION">Formation</option>
-              </select>
+              <Select value={leaveForm.type} onChange={v => setLeaveForm(f => ({ ...f, type: v }))}
+                options={[{ value: 'CONGE_ANNUEL', label: 'Congé annuel' }, { value: 'MALADIE', label: 'Maladie' }, { value: 'MATERNITE', label: 'Maternité' }, { value: 'PATERNITE', label: 'Paternité' }, { value: 'SANS_SOLDE', label: 'Sans solde' }, { value: 'FORMATION', label: 'Formation' }]} className="w-full" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Date début *</label>
-                <input type="date" value={leaveForm.startDate} onChange={e => setLeaveForm(f => ({ ...f, startDate: e.target.value }))} required
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                <DatePicker value={leaveForm.startDate} onChange={v => setLeaveForm(f => ({ ...f, startDate: v }))} className="w-full" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Date fin *</label>
-                <input type="date" value={leaveForm.endDate} onChange={e => setLeaveForm(f => ({ ...f, endDate: e.target.value }))} required
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                <DatePicker value={leaveForm.endDate} onChange={v => setLeaveForm(f => ({ ...f, endDate: v }))} className="w-full" />
               </div>
             </div>
             <div>
@@ -875,7 +1048,7 @@ export default function RH() {
               <textarea value={trainForm.description} onChange={e => setTrainForm(f => ({ ...f, description: e.target.value }))} rows={2}
                 className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 resize-none" placeholder="Détails de la formation..." />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Formateur</label>
                 <input value={trainForm.trainer} onChange={e => setTrainForm(f => ({ ...f, trainer: e.target.value }))}
@@ -887,16 +1060,14 @@ export default function RH() {
                   className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" placeholder="Lieu de la formation" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Date début *</label>
-                <input type="date" value={trainForm.startDate} onChange={e => setTrainForm(f => ({ ...f, startDate: e.target.value }))} required
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                <DatePicker value={trainForm.startDate} onChange={v => setTrainForm(f => ({ ...f, startDate: v }))} className="w-full" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Date fin</label>
-                <input type="date" value={trainForm.endDate} onChange={e => setTrainForm(f => ({ ...f, endDate: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                <DatePicker value={trainForm.endDate} onChange={v => setTrainForm(f => ({ ...f, endDate: v }))} className="w-full" />
               </div>
             </div>
             <div>
@@ -928,6 +1099,246 @@ export default function RH() {
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    )}
+
+    {/* ═══ Modal Supprimer paie ═══ */}
+    {deletePayrollItem && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <Trash2 size={18} className="text-red-500" /> Supprimer la paie
+            </h2>
+            <button onClick={() => setDeletePayrollItem(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} className="text-slate-500" /></button>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+              <p className="font-semibold mb-1">Êtes-vous sûr de vouloir supprimer cette paie ?</p>
+              <p className="text-xs">Paie de <strong>{String(deletePayrollItem.month).padStart(2,'0')}/{deletePayrollItem.year}</strong> — {deletePayrollItem.lines?.length ?? 0} agent(s)</p>
+              <p className="text-xs mt-2">Toutes les lignes de paie des employés seront définitivement supprimées. Cette action est irréversible.</p>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setDeletePayrollItem(null)} className="px-4 py-2 rounded-lg border border-slate-200 text-sm">Annuler</button>
+              <button onClick={handleDeletePayroll} disabled={deleteLoading}
+                className="flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 disabled:opacity-60">
+                {deleteLoading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Supprimer définitivement
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ═══ Modal Générer paie avec sélection d'agents ═══ */}
+    {showGenModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <DollarSign size={18} className="text-sagard-yellow-dark" /> Générer la paie — {now.toLocaleString('fr-FR', { month: 'long' })} {now.getFullYear()}
+            </h2>
+            <button onClick={() => setShowGenModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} className="text-slate-500" /></button>
+          </div>
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={genSearch}
+                onChange={e => setGenSearch(e.target.value)}
+                placeholder="Rechercher un agent..."
+                className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/30"
+              />
+            </div>
+            <button onClick={() => {
+              const activeAgents = agents.filter((a: any) => a.status === 'EN_POSTE')
+              setSelectedAgentIds(new Set(activeAgents.map((a: any) => a.id)))
+            }} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg font-medium">Tout sélectionner</button>
+            <button onClick={() => setSelectedAgentIds(new Set())} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg font-medium">Tout désélectionner</button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-6 py-3">
+            {(() => {
+              const activeAgents = agents.filter((a: any) => a.status === 'EN_POSTE')
+              const filtered = genSearch
+                ? activeAgents.filter((a: any) => {
+                    const name = `${a.user?.firstName ?? ''} ${a.user?.lastName ?? ''}`.toLowerCase()
+                    const mat = (a.matricule ?? '').toLowerCase()
+                    return name.includes(genSearch.toLowerCase()) || mat.includes(genSearch.toLowerCase())
+                  })
+                : activeAgents
+              if (filtered.length === 0) {
+                return <div className="py-8 text-center text-slate-400 text-sm">Aucun agent trouvé</div>
+              }
+              return (
+                <div className="divide-y divide-slate-50">
+                  {filtered.map((a: any) => {
+                    const checked = selectedAgentIds.has(a.id)
+                    return (
+                      <label key={a.id} className="flex items-center gap-3 py-2.5 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded-lg">
+                        <input type="checkbox" checked={checked}
+                          onChange={() => {
+                            setSelectedAgentIds(prev => {
+                              const next = new Set(prev)
+                              if (next.has(a.id)) next.delete(a.id)
+                              else next.add(a.id)
+                              return next
+                            })
+                          }}
+                          className="w-4 h-4 rounded text-sagard-yellow focus:ring-sagard-yellow/30"
+                        />
+                        <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-500">
+                          {(a.user?.firstName?.[0] ?? '?')}{(a.user?.lastName?.[0] ?? '')}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-800">{a.user?.firstName} {a.user?.lastName}</p>
+                          <p className="text-xs text-slate-400">{a.matricule} · {a.position}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-400">Salaire base</p>
+                          <p className="text-sm font-semibold text-slate-700">{fmt(a.baseSalary ?? 0)}</p>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+          </div>
+          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+            <p className="text-sm text-slate-500">
+              <span className="font-bold text-slate-800">{selectedAgentIds.size}</span> agent(s) sélectionné(s)
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowGenModal(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-sm">Annuler</button>
+              <button onClick={handleGenerateSelected} disabled={genLoading || selectedAgentIds.size === 0}
+                className="flex items-center gap-2 px-5 py-2 bg-sagard-yellow text-sagard-dark rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark disabled:opacity-60">
+                {genLoading ? <Loader2 size={14} className="animate-spin" /> : <DollarSign size={14} />} Générer la paie
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ═══ Modal Modifier ligne de paie ═══ */}
+    {editLine && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <Pencil size={18} className="text-sagard-yellow-dark" /> Modifier la paie
+            </h2>
+            <button onClick={() => setEditLine(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} className="text-slate-500" /></button>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <div className="bg-slate-50 rounded-lg px-4 py-3">
+              <p className="font-semibold text-slate-800">{editLine.agent?.user?.firstName} {editLine.agent?.user?.lastName}</p>
+              <p className="text-xs text-slate-400 font-mono">{editLine.agent?.matricule} · {editLine.agent?.position}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Jours travaillés</label>
+                <input type="number" min={0} max={31} value={editForm.daysWorked}
+                  onChange={e => setEditForm(f => ({ ...f, daysWorked: +e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Salaire de base</label>
+                <input type="number" min={0} value={editForm.baseSalary}
+                  onChange={e => setEditForm(f => ({ ...f, baseSalary: +e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Primes / Bonus</label>
+                <input type="number" min={0} value={editForm.bonuses}
+                  onChange={e => setEditForm(f => ({ ...f, bonuses: +e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                <p className="text-xs text-slate-400 mt-1">Prime transport, salissure, heures supp, etc.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Retenues</label>
+                <input type="number" min={0} value={editForm.deductions}
+                  onChange={e => setEditForm(f => ({ ...f, deductions: +e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                <p className="text-xs text-slate-400 mt-1">Cotisations, IRPP, avances, sanctions...</p>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Notes (optionnel)</label>
+              <textarea value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                rows={2} placeholder="Ex: Avance sur salaire, prime de rendement..."
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+            </div>
+            <div className="bg-slate-50 rounded-lg px-4 py-3 flex justify-between text-sm">
+              <div>
+                <p className="text-xs text-slate-400">Brut calculé</p>
+                <p className="font-bold text-slate-800">{fmt(Math.round((editForm.baseSalary / 26) * editForm.daysWorked) + editForm.bonuses)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-slate-400">Net calculé</p>
+                <p className="font-bold text-green-700">{fmt(Math.max(Math.round((editForm.baseSalary / 26) * editForm.daysWorked) + editForm.bonuses - editForm.deductions, 0))}</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setEditLine(null)} className="px-4 py-2 rounded-lg border border-slate-200 text-sm">Annuler</button>
+              <button onClick={handleSaveLine} disabled={editSaving}
+                className="flex items-center gap-2 px-5 py-2 bg-sagard-yellow text-sagard-dark rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark disabled:opacity-60">
+                {editSaving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />} Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ═══ Modal Bloquer paie ═══ */}
+    {blockLine && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              {blockLine.blocked ? <ShieldCheck size={18} className="text-green-600" /> : <ShieldOff size={18} className="text-red-500" />}
+              {blockLine.blocked ? 'Débloquer la paie' : 'Bloquer la paie'}
+            </h2>
+            <button onClick={() => setBlockLine(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} className="text-slate-500" /></button>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <div className="bg-slate-50 rounded-lg px-4 py-3">
+              <p className="font-semibold text-slate-800">{blockLine.agent?.user?.firstName} {blockLine.agent?.user?.lastName}</p>
+              <p className="text-xs text-slate-400 font-mono">{blockLine.agent?.matricule} · {blockLine.agent?.position}</p>
+              <p className="text-sm text-slate-600 mt-2">Net à payer : <span className="font-bold text-green-700">{fmt(blockLine.netSalary)}</span></p>
+            </div>
+            {!blockLine.blocked ? (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Motif du blocage</label>
+                  <input value={blockReason} onChange={e => setBlockReason(e.target.value)}
+                    placeholder="Ex: Sanction disciplinaire, avance non remboursée, congé sans autorisation..."
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-300" />
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                  <Ban size={14} className="inline mr-1" />
+                  Le net à payer sera mis à 0. L'employé ne recevra pas son salaire pour cette période.
+                </div>
+              </>
+            ) : (
+              <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700">
+                <ShieldCheck size={14} className="inline mr-1" />
+                La paie sera débloquée. Le net sera recalculé à partir du brut et des retenues.
+              </div>
+            )}
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setBlockLine(null)} className="px-4 py-2 rounded-lg border border-slate-200 text-sm">Annuler</button>
+              <button onClick={handleToggleBlock} disabled={blockSaving}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold disabled:opacity-60 ${
+                  blockLine.blocked ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-red-600 text-white hover:bg-red-700'
+                }`}>
+                {blockSaving ? <Loader2 size={14} className="animate-spin" /> : blockLine.blocked ? <ShieldCheck size={14} /> : <ShieldOff size={14} />}
+                {blockLine.blocked ? 'Débloquer' : 'Bloquer'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     )}

@@ -1,5 +1,5 @@
 export function fmt(n: number) {
-  return new Intl.NumberFormat('fr-FR').format(n) + ' XOF'
+  return new Intl.NumberFormat('fr-FR').format(n) + ' F CFA'
 }
 
 export function fmtDate(s: string) {

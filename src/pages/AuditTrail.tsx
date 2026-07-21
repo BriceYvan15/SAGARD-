@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { History, Filter, Loader2, User, Search, Pencil, Trash2, Plus } from 'lucide-react'
 import { getAuditHistory } from '../services/audit.service'
 import { fmtDate } from '../lib/utils'
+import Select from '../components/Select'
 
 const ENTITIES = [
   { value: '', label: 'Toutes les entités' },
@@ -35,8 +36,8 @@ export default function AuditTrail() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="bg-[#1E1E1E] rounded-xl p-5">
-        <p className="text-[#C8D400] text-xs font-bold uppercase tracking-widest">Traçabilité</p>
+      <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-5">
+        <p className="text-sagard-yellow text-xs font-bold uppercase tracking-widest">Traçabilité</p>
         <p className="text-white text-lg font-bold mt-0.5">Journal des modifications</p>
         <p className="text-slate-400 text-xs mt-1">Historique de toutes les créations, modifications et suppressions</p>
       </div>
@@ -44,10 +45,8 @@ export default function AuditTrail() {
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
         <Filter size={14} className="text-slate-400" />
-        <select value={entity} onChange={e => { setEntity(e.target.value); setPage(1) }}
-          className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white">
-          {ENTITIES.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
-        </select>
+        <Select value={entity} onChange={v => { setEntity(v); setPage(1) }}
+          options={ENTITIES.map(e => ({ value: e.value, label: e.label }))} className="w-full sm:w-48" />
       </div>
 
       {/* Table */}
@@ -57,10 +56,10 @@ export default function AuditTrail() {
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-slate-50 border-b border-slate-100">
                   {['Date', 'Heure', 'Utilisateur', 'Action', 'Entité', 'ID', 'Détails'].map(h => (
-                    <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                    <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50">{h}</th>
                   ))}
                 </tr>
               </thead>

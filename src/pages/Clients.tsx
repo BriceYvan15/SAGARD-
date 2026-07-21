@@ -1,28 +1,25 @@
-import { Fragment, useState } from 'react'
-import { Search, Plus, Users, ChevronDown, ChevronUp, Building2, Loader2, X, MapPin, Phone, FileText, UserPlus, Trash2, Pencil } from 'lucide-react'
+import { Fragment, useState, useMemo, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  Search, Plus, Users, ChevronDown, ChevronUp, Building2, Loader2, X,
+  MapPin, Phone, FileText, UserPlus, Trash2, Pencil, Eye, ShieldCheck,
+  Briefcase, AlertTriangle, MapPinned, Ban, ArrowUp, ArrowDown,
+  CheckSquare, Square, XCircle, MoreVertical, Filter, ChevronLeft, ChevronRight,
+} from 'lucide-react'
 import { fmt } from '../lib/utils'
 import { useApi } from '../lib/useApi'
 import { getClients, createClient, updateClient, deleteClient } from '../services/clients.service'
 import { isDG } from '../lib/roles'
 import AuditHistory from '../components/AuditHistory'
+import Select from '../components/Select'
 
-const STATUS_CFG: Record<string, { label: string; cls: string }> = {
-  ACTIF:    { label: 'Actif',    cls: 'bg-green-100 text-green-700' },
-  INACTIF:  { label: 'Inactif', cls: 'bg-slate-100 text-slate-500' },
-  PROSPECT: { label: 'Prospect', cls: 'bg-blue-100 text-blue-700' },
-  SUSPENDU: { label: 'Suspendu', cls: 'bg-red-100 text-red-700' },
+const STATUS_CFG: Record<string, { label: string; cls: string; dot: string }> = {
+  ACTIF:    { label: 'Actif',    cls: 'bg-green-100 text-green-700',    dot: 'bg-green-500' },
+  INACTIF:  { label: 'Inactif',  cls: 'bg-slate-100 text-slate-500',   dot: 'bg-slate-400' },
+  PROSPECT: { label: 'Prospect', cls: 'bg-blue-100 text-blue-700',     dot: 'bg-blue-500' },
+  SUSPENDU: { label: 'Suspendu', cls: 'bg-red-100 text-red-700',       dot: 'bg-red-500' },
 }
 
-const SEGMENTS = [
-  { value: 'RESIDENTIEL',             label: 'Résidentiel' },
-  { value: 'COMMERCIAL',              label: 'Commercial' },
-  { value: 'INDUSTRIEL',              label: 'Industriel' },
-  { value: 'BANQUE_FINANCE',          label: 'Banque / Finance' },
-  { value: 'AMBASSADE_DIPLOMATIQUE',  label: 'Ambassade / Diplomatique' },
-  { value: 'EVENEMENTIEL',            label: 'Événementiel' },
-  { value: 'ADMINISTRATION_PUBLIQUE', label: 'Administration publique' },
-  { value: 'AUTRE',                   label: 'Autre' },
-]
 
 type ExtraContact = { firstName: string; lastName: string; phone: string; email?: string; whatsapp?: string; position?: string }
 
@@ -57,7 +54,32 @@ export default function Clients() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [activeTab, setActiveTab] = useState('identification')
-  const [form, setForm]           = useState<typeof EMPTY_FORM>({ ...EMPTY_FORM })
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [sortBy, setSortBy]     = useState<'name' | 'createdAt' | 'status'>('name')
+  const [sortDir, setSortDir]   = useState<'asc' | 'desc'>('asc')
+  const [bulkAction, setBulkAction] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [actionMenu, setActionMenu] = useState<string | null>(null)
+  const [menuPos, setMenuPos] = useState<{ top?: number; bottom?: number; left?: number } | null>(null)
+  const actionBtnRef = useRef<HTMLButtonElement | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const nav = useNavigate()
+  const customSegments: string[] = (() => {
+    try {
+      const s = localStorage.getItem('sagard_client_segments');
+      return s ? JSON.parse(s) : [
+        'Résidentiel', 'Commercial', 'Industriel', 'Banque / Finance',
+        'Ambassade / Diplomatique', 'Événementiel', 'Administration publique',
+        'Particulier', 'Entreprise privée', 'Institution publique', 'ONG',
+        'Ambassade', 'Autre'
+      ]
+    } catch {
+      return []
+    }
+  })()
+
+  const [form, setForm]           = useState<typeof EMPTY_FORM>(() => ({ ...EMPTY_FORM, segment: customSegments[0] ?? 'Commercial' }))
   const [saving, setSaving]       = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [editingStatus, setEditingStatus] = useState<string | null>(null)
@@ -68,6 +90,7 @@ export default function Clients() {
 
   const set = (k: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }))
+  const setVal = (k: keyof typeof EMPTY_FORM) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
   const updateExtra = (i: number, key: keyof ExtraContact, v: string) =>
     setForm(f => ({ ...f, additionalContacts: f.additionalContacts.map((c, idx) => idx === i ? { ...c, [key]: v } : c) }))
@@ -119,161 +142,425 @@ export default function Clients() {
     }
   }
 
-  const filtered = all.filter(c => {
+  const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    const matchSearch = c.name.toLowerCase().includes(q)
-      || (c.sector ?? '').toLowerCase().includes(q)
-      || (c.city ?? '').toLowerCase().includes(q)
-    const matchFilter = filter === 'all' || c.status === filter
-    return matchSearch && matchFilter
-  })
+    let result = all.filter(c => {
+      const matchSearch = c.name.toLowerCase().includes(q)
+        || (c.sector ?? '').toLowerCase().includes(q)
+        || (c.city ?? '').toLowerCase().includes(q)
+      const matchFilter = filter === 'all' || c.status === filter
+      return matchSearch && matchFilter
+    })
+    result = [...result].sort((a, b) => {
+      let cmp = 0
+      if (sortBy === 'name') cmp = (a.name ?? '').localeCompare(b.name ?? '')
+      else if (sortBy === 'createdAt') cmp = new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime()
+      else if (sortBy === 'status') cmp = (a.status ?? '').localeCompare(b.status ?? '')
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return result
+  }, [all, search, filter, sortBy, sortDir])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  const goToPage = (p: number) => setPage(Math.max(1, Math.min(p, totalPages)))
+
+  useEffect(() => { setPage(1) }, [search, filter, sortBy, sortDir])
 
   const counts = {
     all:      all.length,
     ACTIF:    all.filter(c => c.status === 'ACTIF').length,
     PROSPECT: all.filter(c => c.status === 'PROSPECT').length,
     INACTIF:  all.filter(c => c.status === 'INACTIF').length,
+    SUSPENDU: all.filter(c => c.status === 'SUSPENDU').length,
+  }
+
+  const toggleSelect = (id: string) =>
+    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  const toggleSelectAll = () =>
+    setSelected(prev => prev.size === filtered.length ? new Set() : new Set(filtered.map(c => c.id)))
+
+  const clearSelection = () => setSelected(new Set())
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Supprimer ${selected.size} client(s) ? Ils seront désactivés.`)) return
+    setBulkAction('deleting')
+    setDeleteError(null)
+    try {
+      for (const id of selected) await deleteClient(id)
+      clearSelection()
+      reload()
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.message ?? 'Erreur lors de la suppression.')
+    } finally {
+      setBulkAction(null)
+    }
+  }
+
+  const handleBulkStatus = async (newStatus: string) => {
+    setBulkAction('status')
+    setDeleteError(null)
+    try {
+      for (const id of selected) await updateClient(id, { status: newStatus })
+      clearSelection()
+      reload()
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.message ?? 'Erreur lors du changement de statut.')
+    } finally {
+      setBulkAction(null)
+    }
+  }
+
+  const handleDelete = async (client: any) => {
+    if (!confirm(`Supprimer le client ${client.name} ? Il sera désactivé.`)) return
+    setDeleteError(null)
+    try {
+      await deleteClient(client.id)
+      setExpanded(null)
+      reload()
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.message ?? 'Erreur lors de la suppression.')
+    }
+  }
+
+  const toggleSort = (col: 'name' | 'createdAt' | 'status') => {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortBy(col); setSortDir('asc') }
   }
 
   return (
     <Fragment>
     <div className="space-y-5">
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* === KPI CARDS === */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {([
-          { key: 'all',      label: 'Total clients', count: counts.all },
-          { key: 'ACTIF',    label: 'Actifs',        count: counts.ACTIF },
-          { key: 'PROSPECT', label: 'Prospects',     count: counts.PROSPECT },
-          { key: 'INACTIF',  label: 'Inactifs',      count: counts.INACTIF },
-        ]).map(s => (
-          <button key={s.key} onClick={() => setFilter(s.key)}
-            className={`bg-white rounded-xl p-4 border text-left transition-all ${filter === s.key ? 'border-sagard-yellow shadow-md' : 'border-slate-200 hover:border-slate-300'}`}>
-            {loading
-              ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
-              : <p className="text-2xl font-black text-slate-800">{s.count}</p>}
-            <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
-          </button>
-        ))}
+          { key: 'all',      label: 'Total',    count: counts.all,      icon: Building2,   color: 'bg-slate-100 text-slate-600' },
+          { key: 'ACTIF',    label: 'Actifs',   count: counts.ACTIF,    icon: ShieldCheck, color: 'bg-green-50 text-green-600' },
+          { key: 'PROSPECT', label: 'Prospects',count: counts.PROSPECT, icon: UserPlus,    color: 'bg-blue-50 text-blue-600' },
+          { key: 'INACTIF',  label: 'Inactifs', count: counts.INACTIF,  icon: Users,       color: 'bg-amber-50 text-amber-600' },
+          { key: 'SUSPENDU', label: 'Suspendus',count: counts.SUSPENDU, icon: Ban,         color: 'bg-red-50 text-red-600' },
+        ]).map(s => {
+          const Icon = s.icon
+          const active = filter === s.key
+          return (
+            <button key={s.key} onClick={() => setFilter(s.key)}
+              className={`bg-white rounded-xl p-3.5 border text-left transition-all flex items-center gap-3 ${active ? 'border-sagard-yellow shadow-md ring-1 ring-sagard-yellow/30' : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'}`}>
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${s.color}`}>
+                <Icon size={16} />
+              </div>
+              <div className="min-w-0">
+                {loading
+                  ? <div className="w-8 h-6 bg-slate-200 rounded animate-pulse" />
+                  : <p className="text-xl font-black text-slate-800 leading-none">{s.count}</p>}
+                <p className="text-[11px] text-slate-500 mt-1 truncate">{s.label}</p>
+              </div>
+            </button>
+          )
+        })}
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 border-b border-slate-100">
-          <div className="relative w-full sm:w-72">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Nom, secteur, ville..."
-              className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+      {/* === ERROR BANNER === */}
+      {deleteError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-lg text-sm flex items-center justify-between">
+          <span>{deleteError}</span>
+          <button onClick={() => setDeleteError(null)} className="text-red-400 hover:text-red-600"><X size={16} /></button>
+        </div>
+      )}
+
+      {/* === MAIN PANEL === */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 border-b border-slate-100">
+          <div className="flex items-center gap-2 flex-1 flex-wrap">
+            <div className="relative flex-1 min-w-[150px] max-w-xs">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Rechercher..."
+                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+            </div>
+            <Select value={sortBy} onChange={v => setSortBy(v as any)}
+              options={[{ value: 'name', label: 'Trier par nom' }, { value: 'createdAt', label: 'Trier par date' }, { value: 'status', label: 'Trier par statut' }]}
+              className="w-36 sm:w-44" />
+            <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+              className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors flex-shrink-0">
+              {sortDir === 'asc' ? <ArrowUp size={14} className="text-slate-500" /> : <ArrowDown size={14} className="text-slate-500" />}
+            </button>
           </div>
           <button onClick={() => { setForm({ ...EMPTY_FORM }); setEditingClient(null); setActiveTab('identification'); setShowModal(true); setFormError(null) }}
-            className="flex items-center gap-2 bg-sagard-yellow text-sagard-dark px-4 py-2 rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark transition-colors">
+            className="flex items-center gap-2 bg-sagard-yellow text-sagard-dark px-4 py-2 rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark transition-colors flex-shrink-0">
             <Plus size={15} /> Nouveau client
           </button>
         </div>
 
+        {/* Bulk action bar */}
+        {selected.size > 0 && (
+          <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-sagard-yellow/5 border-b border-sagard-yellow/20">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-slate-700">{selected.size} sélectionné{selected.size > 1 ? 's' : ''}</span>
+              <button onClick={clearSelection} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700">
+                <XCircle size={13} /> Annuler
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select onChange={v => { if (v) handleBulkStatus(v) }}
+                disabled={!!bulkAction}
+                options={[{ value: 'ACTIF', label: 'Activer' }, { value: 'INACTIF', label: 'Désactiver' }, { value: 'SUSPENDU', label: 'Suspendre' }, { value: 'PROSPECT', label: 'Prospect' }]}
+                placeholder="Changer statut…"
+                size="sm"
+                className="w-36"
+              />
+              <button onClick={handleBulkDelete} disabled={!!bulkAction}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 transition-colors disabled:opacity-50">
+                {bulkAction === 'deleting' ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                Supprimer
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Content */}
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="animate-spin text-slate-300" size={28} /></div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-16 text-slate-400">
+            <Users size={40} className="mx-auto mb-3 opacity-30" />
+            <p>{search || filter !== 'all' ? 'Aucun résultat' : 'Aucun client enregistré'}</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  {['Client', ...(isDG() ? ['Commercial'] : []), 'Secteur', 'Contact principal', 'Contrats', 'CA Total', 'Statut', ''].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-                  ))}
+              {/* Table header */}
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="w-10 px-4 py-2.5">
+                    <button onClick={toggleSelectAll}>
+                      {selected.size === filtered.length && filtered.length > 0
+                        ? <CheckSquare size={16} className="text-sagard-yellow-dark" />
+                        : <Square size={16} className="text-slate-400 hover:text-slate-500" />}
+                    </button>
+                  </th>
+                  <th className="text-left px-2 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-pointer hover:text-slate-700"
+                    onClick={() => toggleSort('name')}>
+                    <span className="flex items-center gap-1">Client {sortBy === 'name' && (sortDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}</span>
+                  </th>
+                  <th className="text-left px-2 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Contact</th>
+                  <th className="text-left px-2 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Secteur</th>
+                  <th className="text-center px-2 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden sm:table-cell">Contrats</th>
+                  <th className="text-center px-2 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden sm:table-cell">Sites</th>
+                  <th className="text-left px-2 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide cursor-pointer hover:text-slate-700"
+                    onClick={() => toggleSort('status')}>
+                    <span className="flex items-center gap-1">Statut {sortBy === 'status' && (sortDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}</span>
+                  </th>
+                  <th className="w-10 px-2 py-2.5"></th>
                 </tr>
               </thead>
-              <tbody>
-                {filtered.map(client => {
-                  const st    = STATUS_CFG[client.status] ?? { label: client.status, cls: 'bg-slate-100 text-slate-500' }
+              <tbody className="divide-y divide-slate-50">
+                {paginated.map(client => {
+                  const st    = STATUS_CFG[client.status] ?? { label: client.status, cls: 'bg-slate-100 text-slate-500', dot: 'bg-slate-400' }
                   const contact = client.contacts?.[0]
                   const nbContracts = client._count?.contracts ?? client.contracts?.length ?? 0
-                  const totalRev    = client._count?.invoices ?? 0
+                  const nbSites     = client._count?.sites ?? client.sites?.length ?? 0
+                  const isOpen = expanded === client.id
+                  const isChecked = selected.has(client.id)
 
                   return (
                     <Fragment key={client.id}>
-                      <tr className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                      <tr className={`transition-colors ${isChecked ? 'bg-sagard-yellow/5' : 'hover:bg-slate-50'}`}>
+                        {/* Checkbox */}
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
+                          <button onClick={() => toggleSelect(client.id)}>
+                            {isChecked
+                              ? <CheckSquare size={16} className="text-sagard-yellow-dark" />
+                              : <Square size={16} className="text-slate-300 hover:text-slate-400" />}
+                          </button>
+                        </td>
+                        {/* Client name + code */}
+                        <td className="px-2 py-3">
+                          <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-lg bg-sagard-yellow/20 flex items-center justify-center flex-shrink-0">
-                              <Building2 size={14} className="text-sagard-yellow-dark" />
+                              <Building2 size={15} className="text-sagard-yellow-dark" />
                             </div>
-                            <div>
-                              <p className="font-semibold text-slate-800">{client.name}</p>
-                              <p className="text-xs text-slate-400">{client.city ?? '—'}</p>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-800 truncate">{client.name}</p>
+                              <div className="flex items-center gap-2 text-xs text-slate-400">
+                                {client.code && <span className="font-mono">{client.code}</span>}
+                                {client.city && <span className="flex items-center gap-0.5"><MapPin size={10} />{client.city}</span>}
+                              </div>
                             </div>
                           </div>
                         </td>
-                        {isDG() && (
-                          <td className="px-4 py-3">
-                            {client.createdBy ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 text-xs font-semibold">
-                                {client.createdBy.firstName} {client.createdBy.lastName}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 text-xs italic">Direct</span>
-                            )}
-                          </td>
-                        )}
-                        <td className="px-4 py-3 text-slate-600 text-xs">{client.sector ?? '—'}</td>
-                        <td className="px-4 py-3">
+                        {/* Contact */}
+                        <td className="px-2 py-3 hidden md:table-cell">
                           {contact ? (
-                            <>
-                              <p className="text-slate-700 font-medium text-xs">{contact.firstName} {contact.lastName}</p>
-                              <p className="text-slate-400 text-xs">{contact.phone ?? contact.email ?? '—'}</p>
-                            </>
+                            <div className="text-xs">
+                              <p className="text-slate-700 font-medium">{contact.firstName} {contact.lastName}</p>
+                              <p className="text-slate-400">{contact.phone ?? contact.email ?? '—'}</p>
+                            </div>
                           ) : <span className="text-slate-400 text-xs">—</span>}
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className="font-bold text-slate-800">{nbContracts}</span>
+                        {/* Sector */}
+                        <td className="px-2 py-3 hidden lg:table-cell">
+                          <span className="text-xs text-slate-600">{client.sector ?? '—'}</span>
                         </td>
-                        <td className="px-4 py-3 font-bold text-slate-800 text-xs">
-                          {totalRev > 0 ? fmt(totalRev) : '—'}
+                        {/* Contracts count */}
+                        <td className="px-2 py-3 text-center hidden sm:table-cell">
+                          <span className="text-sm font-bold text-slate-700">{nbContracts}</span>
                         </td>
-                        <td className="px-4 py-3">
+                        {/* Sites count */}
+                        <td className="px-2 py-3 text-center hidden sm:table-cell">
+                          <span className="text-sm font-bold text-slate-700">{nbSites}</span>
+                        </td>
+                        {/* Status */}
+                        <td className="px-2 py-3">
                           {editingStatus === client.id ? (
-                            <select
+                            <Select
                               value={client.status}
-                              onChange={e => handleStatusChange(client.id, e.target.value)}
-                              onBlur={() => setEditingStatus(null)}
-                              autoFocus
-                              className="px-2 py-1 rounded-lg text-xs font-semibold border border-sagard-yellow bg-white focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40"
-                            >
-                              {Object.entries(STATUS_CFG).map(([val, cfg]) => (
-                                <option key={val} value={val}>{cfg.label}</option>
-                              ))}
-                            </select>
+                              onChange={v => handleStatusChange(client.id, v)}
+                              options={Object.entries(STATUS_CFG).map(([val, cfg]) => ({ value: val, label: cfg.label }))}
+                              size="sm"
+                              className="w-32"
+                            />
                           ) : (
                             <button
                               onClick={() => setEditingStatus(client.id)}
-                              className={`px-2 py-1 rounded-full text-xs font-semibold cursor-pointer hover:ring-2 hover:ring-sagard-yellow/40 transition-all ${st.cls}`}
+                              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold cursor-pointer hover:ring-2 hover:ring-sagard-yellow/40 transition-all ${st.cls}`}
                               title="Cliquez pour changer le statut"
                             >
+                              <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
                               {st.label}
                             </button>
                           )}
                         </td>
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() => setExpanded(expanded === client.id ? null : client.id)}
-                            className="flex items-center gap-1 text-xs text-slate-500 hover:text-sagard-yellow-dark font-medium"
-                          >
-                            {expanded === client.id
-                              ? <><ChevronUp size={13} />Masquer</>
-                              : <><ChevronDown size={13} />Détails</>}
+                        {/* Actions menu */}
+                        <td className="px-2 py-3 relative">
+                          <button ref={actionBtnRef} onClick={() => {
+                            if (actionMenu === client.id) {
+                              setActionMenu(null)
+                            } else {
+                              const rect = actionBtnRef.current?.getBoundingClientRect()
+                              if (rect) {
+                                const spaceBelow = window.innerHeight - rect.bottom
+                                const spaceAbove = rect.top
+                                const menuWidth = 160
+                                const left = Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8)
+                                if (spaceBelow < 200 && spaceAbove > spaceBelow) {
+                                  setMenuPos({ bottom: window.innerHeight - rect.top + 4, left })
+                                } else {
+                                  setMenuPos({ top: rect.bottom + 4, left })
+                                }
+                              }
+                              setActionMenu(client.id)
+                            }
+                          }}
+                            className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+                            <MoreVertical size={15} className="text-slate-400" />
                           </button>
+                          {actionMenu === client.id && menuPos && (
+                            <>
+                              <div className="fixed inset-0 z-40" onClick={() => setActionMenu(null)} />
+                              <div
+                                style={{ top: menuPos.top, bottom: menuPos.bottom, left: menuPos.left }}
+                                className="fixed z-50 bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[160px]">
+                                <button onClick={() => { setExpanded(isOpen ? null : client.id); setActionMenu(null) }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors">
+                                  {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                  {isOpen ? 'Masquer' : 'Aperçu'}
+                                </button>
+                                <button onClick={() => { nav(`/clients/${client.id}`); setActionMenu(null) }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors">
+                                  <Eye size={13} /> Fiche complète
+                                </button>
+                                <button onClick={() => {
+                                  setEditingClient(client)
+                                  setForm({
+                                    name: client.name ?? '', legalName: client.legalName ?? '', segment: client.segment ?? customSegments[0] ?? 'Commercial',
+                                    sector: client.sector ?? '', rccm: client.rccm ?? '', ncc: client.ncc ?? '', cniNumber: client.cniNumber ?? '',
+                                    phone: client.phone ?? '', phone2: client.phone2 ?? '', mobile: client.mobile ?? '',
+                                    email: client.email ?? '', website: client.website ?? '',
+                                    address: client.address ?? '', street2: client.street2 ?? '', zip: client.zip ?? '',
+                                    city: client.city ?? '', district: client.district ?? '', quartier: client.quartier ?? '',
+                                    country: client.country ?? "Côte d'Ivoire",
+                                    latitude: client.latitude ? String(client.latitude) : '', longitude: client.longitude ? String(client.longitude) : '',
+                                    notes: client.notes ?? '',
+                                    contactFirstName: client.contactFirstName ?? '', contactLastName: client.contactLastName ?? '',
+                                    contactPhone: client.contacts?.[0]?.phone ?? '', contactEmail: client.contacts?.[0]?.email ?? '',
+                                    contactWhatsapp: client.contacts?.[0]?.whatsapp ?? '', contactPosition: client.contacts?.[0]?.position ?? '',
+                                    additionalContacts: [],
+                                  })
+                                  setActiveTab('identification')
+                                  setShowModal(true)
+                                  setActionMenu(null)
+                                }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors">
+                                  <Pencil size={13} /> Modifier
+                                </button>
+                                <div className="border-t border-slate-100 my-1" />
+                                <button onClick={() => { handleDelete(client); setActionMenu(null) }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors">
+                                  <Trash2 size={13} /> Supprimer
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </td>
                       </tr>
 
-                      {expanded === client.id && (
+                      {/* Expanded preview row */}
+                      {isOpen && (
                         <tr className="bg-slate-50">
-                          <td colSpan={isDG() ? 8 : 7} className="px-6 py-4">
-                            {/* Action buttons */}
-                            <div className="flex gap-2 mb-4">
+                          <td colSpan={8} className="px-6 py-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                              {/* Address */}
+                              <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                <div className="flex items-center gap-1.5 mb-2">
+                                  <MapPin size={13} className="text-slate-400" />
+                                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Adresse</p>
+                                </div>
+                                <p className="text-sm text-slate-700">{client.address ?? '—'}</p>
+                                <p className="text-xs text-slate-400 mt-0.5">{client.city}{client.country ? `, ${client.country}` : ''}</p>
+                              </div>
+                              {/* Contacts */}
+                              <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                <div className="flex items-center gap-1.5 mb-2">
+                                  <Phone size={13} className="text-slate-400" />
+                                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Contacts</p>
+                                </div>
+                                {(client.contacts ?? []).length > 0 ? (client.contacts ?? []).slice(0, 3).map((ct: any) => (
+                                  <p key={ct.id} className="text-xs text-slate-700 leading-relaxed">{ct.firstName} {ct.lastName} — {ct.role ?? 'Contact'}</p>
+                                )) : <p className="text-xs text-slate-400">Aucun contact</p>}
+                                {(client.contacts ?? []).length > 3 && <p className="text-xs text-slate-400 mt-1">+{(client.contacts ?? []).length - 3} autre(s)</p>}
+                              </div>
+                              {/* Sites */}
+                              <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                <div className="flex items-center gap-1.5 mb-2">
+                                  <MapPinned size={13} className="text-slate-400" />
+                                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Sites</p>
+                                </div>
+                                {(client.sites ?? []).length > 0 ? (client.sites ?? []).slice(0, 3).map((s: any) => (
+                                  <p key={s.id} className="text-xs text-slate-700 leading-relaxed">{s.name}</p>
+                                )) : <p className="text-xs text-slate-400">Aucun site</p>}
+                                {(client.sites ?? []).length > 3 && <p className="text-xs text-slate-400 mt-1">+{(client.sites ?? []).length - 3} autre(s)</p>}
+                              </div>
+                              {/* Complaints */}
+                              <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                <div className="flex items-center gap-1.5 mb-2">
+                                  <AlertTriangle size={13} className="text-slate-400" />
+                                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Réclamations</p>
+                                </div>
+                                {(client.complaints ?? []).length > 0 ? (client.complaints ?? []).slice(0, 3).map((cp: any) => (
+                                  <p key={cp.id} className="text-xs text-slate-700 leading-relaxed">{cp.title} — <span className="text-slate-400">{cp.status}</span></p>
+                                )) : <p className="text-xs text-slate-400">Aucune</p>}
+                              </div>
+                            </div>
+                            {/* Audit + actions */}
+                            <div className="flex items-center gap-2 mt-4">
                               <button onClick={() => {
                                 setEditingClient(client)
                                 setForm({
-                                  name: client.name ?? '', legalName: client.legalName ?? '', segment: client.segment ?? 'COMMERCIAL',
+                                  name: client.name ?? '', legalName: client.legalName ?? '', segment: client.segment ?? customSegments[0] ?? 'Commercial',
                                   sector: client.sector ?? '', rccm: client.rccm ?? '', ncc: client.ncc ?? '', cniNumber: client.cniNumber ?? '',
                                   phone: client.phone ?? '', phone2: client.phone2 ?? '', mobile: client.mobile ?? '',
                                   email: client.email ?? '', website: client.website ?? '',
@@ -293,44 +580,10 @@ export default function Clients() {
                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition-colors">
                                 <Pencil size={12} /> Modifier
                               </button>
-                              {isDG() && (
-                                <button onClick={async () => {
-                                  if (!confirm(`Supprimer le client ${client.name} ? Il sera désactivé.`)) return
-                                  await deleteClient(client.id)
-                                  reload()
-                                }}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 transition-colors">
-                                  <Trash2 size={12} /> Supprimer
-                                </button>
-                              )}
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                              <div>
-                                <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">Adresse</p>
-                                <p className="text-slate-700">{client.address ?? '—'}</p>
-                                <p className="text-slate-500 text-xs">{client.city}{client.country ? `, ${client.country}` : ''}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">Contacts</p>
-                                {(client.contacts ?? []).map((ct: any) => (
-                                  <p key={ct.id} className="text-slate-700 text-xs">{ct.firstName} {ct.lastName} — {ct.role ?? 'Contact'}</p>
-                                ))}
-                                {(client.contacts ?? []).length === 0 && <p className="text-slate-400 text-xs">Aucun contact</p>}
-                              </div>
-                              <div>
-                                <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">Sites gardiennés</p>
-                                {(client.sites ?? []).map((s: any) => (
-                                  <p key={s.id} className="text-slate-700 text-xs">{s.name}</p>
-                                ))}
-                                {(client.sites ?? []).length === 0 && <p className="text-slate-400 text-xs">Aucun site</p>}
-                              </div>
-                              <div>
-                                <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">Réclamations</p>
-                                {(client.complaints ?? []).map((c: any) => (
-                                  <p key={c.id} className="text-slate-700 text-xs">{c.title} — <span className="text-slate-400">{c.status}</span></p>
-                                ))}
-                                {(client.complaints ?? []).length === 0 && <p className="text-slate-400 text-xs">Aucune</p>}
-                              </div>
+                              <button onClick={() => handleDelete(client)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 transition-colors">
+                                <Trash2 size={12} /> Supprimer
+                              </button>
                             </div>
                             <div className="mt-4">
                               <AuditHistory entity="Client" entityId={client.id} />
@@ -343,12 +596,42 @@ export default function Clients() {
                 })}
               </tbody>
             </table>
-            {filtered.length === 0 && (
-              <div className="text-center py-12 text-slate-400">
-                <Users size={40} className="mx-auto mb-3 opacity-30" />
-                <p>{search || filter !== 'all' ? 'Aucun résultat' : 'Aucun client enregistré'}</p>
-              </div>
-            )}
+          </div>
+        )}
+
+        {/* Pagination footer */}
+        {filtered.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 text-sm">
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span>Afficher</span>
+              <Select value={String(pageSize)} onChange={v => { setPageSize(Number(v)); setPage(1) }}
+                options={[{ value: '10', label: '10' }, { value: '25', label: '25' }, { value: '50', label: '50' }, { value: '100', label: '100' }]}
+                size="sm" className="w-20" />
+              <span>par page · {filtered.length} au total</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage <= 1}
+                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                <ChevronLeft size={15} className="text-slate-500" />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .map((p, idx, arr) => (
+                  <Fragment key={p}>
+                    {idx > 0 && arr[idx - 1] !== p - 1 && (
+                      <span className="px-1 text-slate-400">…</span>
+                    )}
+                    <button onClick={() => goToPage(p)}
+                      className={`min-w-[28px] h-7 px-1 rounded-lg text-xs font-semibold transition-colors ${p === currentPage ? 'bg-sagard-yellow text-sagard-dark' : 'text-slate-600 hover:bg-slate-100'}`}>
+                      {p}
+                    </button>
+                  </Fragment>
+                ))}
+              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage >= totalPages}
+                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                <ChevronRight size={15} className="text-slate-500" />
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -388,8 +671,8 @@ export default function Clients() {
             <div className="px-6 py-5 space-y-5">
             {/* === ONGLET IDENTIFICATION === */}
             {activeTab === 'identification' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Nom commercial *</label>
                   <input value={form.name} onChange={set('name')} required
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" placeholder="Ex: SGBCI" />
@@ -401,10 +684,8 @@ export default function Clients() {
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Segment client *</label>
-                  <select value={form.segment} onChange={set('segment')} required
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                    {SEGMENTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
+                  <Select value={form.segment} onChange={setVal('segment')} required
+                    options={customSegments.map(s => ({ value: s, label: s }))} className="w-full" />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-xs font-medium text-slate-600 mb-1">N° RCCM</label>
@@ -426,7 +707,7 @@ export default function Clients() {
                   <input value={form.cniNumber} onChange={set('cniNumber')}
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" placeholder="CI-XXXXXXXXX" />
                 </div>
-                <div className="col-span-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <div className="col-span-1 sm:col-span-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
                   <p className="text-xs text-amber-700"><b>Note :</b> Le <b>code client</b> (ex: CLI-2026-0001) sera généré automatiquement à l'enregistrement.</p>
                 </div>
               </div>
@@ -437,13 +718,13 @@ export default function Clients() {
               <div className="space-y-4">
                 <div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Adresse postale</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="col-span-1 sm:col-span-2">
                       <label className="block text-xs font-medium text-slate-600 mb-1">Adresse (ligne 1) *</label>
                       <input value={form.address} onChange={set('address')} required
                         className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" placeholder="Rue, numéro..." />
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-1 sm:col-span-2">
                       <label className="block text-xs font-medium text-slate-600 mb-1">Adresse (ligne 2)</label>
                       <input value={form.street2} onChange={set('street2')}
                         className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" placeholder="Complément, bâtiment..." />
@@ -478,7 +759,7 @@ export default function Clients() {
 
                 <div className="border-t border-slate-100 pt-4">
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Coordonnées GPS</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Latitude</label>
                       <input value={form.latitude} onChange={set('latitude')} type="number" step="any"
@@ -494,7 +775,7 @@ export default function Clients() {
 
                 <div className="border-t border-slate-100 pt-4">
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Coordonnées directes (entreprise)</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Contact 1 (téléphone)</label>
                       <input value={form.phone} onChange={set('phone')} type="tel"
@@ -527,7 +808,7 @@ export default function Clients() {
 
             {/* === ONGLET CONTACT PRINCIPAL === */}
             {activeTab === 'contact' && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Prénom *</label>
                   <input value={form.contactFirstName} onChange={set('contactFirstName')} required
@@ -538,7 +819,7 @@ export default function Clients() {
                   <input value={form.contactLastName} onChange={set('contactLastName')} required
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" placeholder="KONAN" />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Fonction</label>
                   <input value={form.contactPosition} onChange={set('contactPosition')}
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" placeholder="Directeur Général, Responsable sécurité..." />
@@ -584,19 +865,19 @@ export default function Clients() {
                       <Trash2 size={14} />
                     </button>
                     <p className="text-xs font-bold text-slate-500 uppercase mb-3">Contact #{i + 2}</p>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <input value={c.firstName} onChange={e => updateExtra(i, 'firstName', e.target.value)} placeholder="Prénom *"
                         className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
                       <input value={c.lastName} onChange={e => updateExtra(i, 'lastName', e.target.value)} placeholder="Nom *"
                         className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
                       <input value={c.position ?? ''} onChange={e => updateExtra(i, 'position', e.target.value)} placeholder="Fonction"
-                        className="col-span-2 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                        className="col-span-1 sm:col-span-2 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
                       <input value={c.phone} onChange={e => updateExtra(i, 'phone', e.target.value)} placeholder="Téléphone *" type="tel"
                         className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
                       <input value={c.whatsapp ?? ''} onChange={e => updateExtra(i, 'whatsapp', e.target.value)} placeholder="WhatsApp" type="tel"
                         className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
                       <input value={c.email ?? ''} onChange={e => updateExtra(i, 'email', e.target.value)} placeholder="Email" type="email"
-                        className="col-span-2 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                        className="col-span-1 sm:col-span-2 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
                     </div>
                   </div>
                 ))}

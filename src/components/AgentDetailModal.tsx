@@ -3,6 +3,8 @@ import { X, Loader2, User, Briefcase, Phone, Mail, MapPin, Shield, Calendar, Clo
 import { getAgent, updateAgent, deleteAgent } from '../services/agents.service'
 import { fmtDate } from '../lib/utils'
 import AuditHistory from './AuditHistory'
+import Select from './Select'
+import DatePicker from './DatePicker'
 
 interface Props {
   agentId: string
@@ -204,11 +206,8 @@ export default function AgentDetailModal({ agentId, onClose, onRefresh }: Props)
                     <EditField label="Lien parental" value={editForm.emergencyRelation} onChange={v => setEditForm((f: any) => ({ ...f, emergencyRelation: v }))} />
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Statut</label>
-                      <select value={editForm.status} onChange={e => setEditForm((f: any) => ({ ...f, status: e.target.value }))}
-                        onMouseDown={e => e.stopPropagation()}
-                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white">
-                        {Object.entries(STATUS_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                      </select>
+                      <Select value={editForm.status} onChange={v => setEditForm((f: any) => ({ ...f, status: v }))}
+                        options={Object.entries(STATUS_CFG).map(([k, v]) => ({ value: k, label: v.label }))} className="w-full" />
                     </div>
                   </div>
                 ) : (
@@ -252,19 +251,13 @@ export default function AgentDetailModal({ agentId, onClose, onRefresh }: Props)
                     <EditField label="Département" value={editForm.department} onChange={v => setEditForm((f: any) => ({ ...f, department: v }))} />
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Vacation</label>
-                      <select value={editForm.shift} onChange={e => setEditForm((f: any) => ({ ...f, shift: e.target.value }))}
-                        onMouseDown={e => e.stopPropagation()}
-                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white">
-                        {Object.entries(SHIFT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                      </select>
+                      <Select value={editForm.shift} onChange={v => setEditForm((f: any) => ({ ...f, shift: v }))}
+                        options={Object.entries(SHIFT_LABELS).map(([k, v]) => ({ value: k, label: v }))} className="w-full" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Type de contrat</label>
-                      <select value={editForm.contractType} onChange={e => setEditForm((f: any) => ({ ...f, contractType: e.target.value }))}
-                        onMouseDown={e => e.stopPropagation()}
-                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white">
-                        {Object.entries(CONTRACT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                      </select>
+                      <Select value={editForm.contractType} onChange={v => setEditForm((f: any) => ({ ...f, contractType: v }))}
+                        options={Object.entries(CONTRACT_LABELS).map(([k, v]) => ({ value: k, label: v }))} className="w-full" />
                     </div>
                     <EditField label="Salaire de base (XOF)" value={editForm.baseSalary} onChange={v => setEditForm((f: any) => ({ ...f, baseSalary: v }))} type="number" />
                     <EditField label="Fin de contrat" value={editForm.contractEndDate} onChange={v => setEditForm((f: any) => ({ ...f, contractEndDate: v }))} type="date" />
@@ -437,9 +430,11 @@ function EditField({ label, value, onChange, type = 'text' }: { label: string; v
   return (
     <div>
       <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
-      <input type={type} value={value || ''} onChange={e => onChange(e.target.value)}
-        onMouseDown={e => e.stopPropagation()}
-        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sagard-yellow/40 focus:border-sagard-yellow outline-none transition-colors bg-white" />
+      {type === 'date'
+        ? <DatePicker value={value || ''} onChange={onChange} className="w-full" />
+        : <input type={type} value={value || ''} onChange={e => onChange(e.target.value)}
+            onMouseDown={e => e.stopPropagation()}
+            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sagard-yellow/40 focus:border-sagard-yellow outline-none transition-colors bg-white" />}
     </div>
   )
 }

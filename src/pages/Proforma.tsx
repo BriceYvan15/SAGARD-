@@ -1,11 +1,14 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileBadge, Search, Eye, Loader2, Plus, X, Trash2, Send, CheckCircle, XCircle } from 'lucide-react'
+import Pagination from '../components/Pagination'
 import { fmt, fmtDate } from '../lib/utils'
 import { useApi } from '../lib/useApi'
 import { getInvoices, createInvoice, updateInvoiceStatus, getServiceCatalog } from '../services/invoices.service'
 import { getClients } from '../services/clients.service'
 import { getLeads } from '../services/leads.service'
+import Select from '../components/Select'
+import DatePicker from '../components/DatePicker'
 
 const STATUS_CFG: Record<string, { label: string; cls: string }> = {
   BROUILLON: { label: 'Brouillon', cls: 'bg-slate-100 text-slate-600' },
@@ -21,6 +24,8 @@ const EMPTY_LINE: Line = { description: '', quantity: 1, unitPrice: 0 }
 export default function Proforma() {
   const nav = useNavigate()
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -44,6 +49,13 @@ export default function Proforma() {
     return (i.reference ?? '').toLowerCase().includes(q)
       || (i.client?.name ?? '').toLowerCase().includes(q)
   })
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filtered.slice(start, start + pageSize)
+  }, [filtered, page, pageSize])
+
+  const goToPage = (p: number) => setPage(Math.max(1, Math.min(p, Math.ceil(filtered.length / pageSize))))
 
   const addLine    = () => setLines(l => [...l, { ...EMPTY_LINE }])
   const removeLine = (i: number) => setLines(l => l.filter((_, idx) => idx !== i))
@@ -87,7 +99,7 @@ export default function Proforma() {
   return (
     <div className="space-y-5">
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
         <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
           <p className="text-2xl font-black text-slate-800">{all.length}</p>
           <p className="text-xs text-slate-500">Total proforma</p>
@@ -104,8 +116,8 @@ export default function Proforma() {
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex items-center justify-between gap-3 p-4 border-b border-slate-100">
-          <div className="relative w-72">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 border-b border-slate-100">
+          <div className="relative w-full sm:w-72">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Référence, client..."
@@ -124,20 +136,20 @@ export default function Proforma() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  {['Référence', 'Prospect / Client', 'Date', 'Échéance', 'Montant', 'Statut', ''].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                  {['Référence', 'Prospect / Client', 'Date', 'Échéance', 'Montant', 'Statut', ''].map((h, idx) => (
+                    <th key={h} className={`text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide ${idx === 2 || idx === 3 ? 'hidden md:table-cell' : ''}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(inv => {
+                {paginated.map(inv => {
                   const st = STATUS_CFG[inv.status] ?? { label: inv.status, cls: 'bg-slate-100 text-slate-500' }
                   return (
                     <tr key={inv.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                       <td className="px-4 py-3 font-mono text-xs font-bold text-slate-700">{inv.reference}</td>
                       <td className="px-4 py-3 font-semibold text-slate-800">{inv.client?.name ?? inv.lead?.companyName ?? '—'}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{fmtDate(inv.issueDate)}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{fmtDate(inv.dueDate)}</td>
+                      <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{fmtDate(inv.issueDate)}</td>
+                      <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{fmtDate(inv.dueDate)}</td>
                       <td className="px-4 py-3 font-bold text-slate-800">{fmt(Number(inv.totalAmount ?? 0))}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${st.cls}`}>{st.label}</span>
@@ -181,14 +193,17 @@ export default function Proforma() {
             )}
           </div>
         )}
+        {filtered.length > 0 && (
+          <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={goToPage} onPageSizeChange={s => { setPageSize(s); setPage(1) }} />
+        )}
       </div>
 
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-slate-100">
+              <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
                 <FileBadge size={18} className="text-sagard-yellow-dark" /> Nouvelle facture proforma
               </h2>
               <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100">
@@ -197,7 +212,7 @@ export default function Proforma() {
             </div>
 
             <form onSubmit={handleCreate} className="flex-1 overflow-y-auto">
-              <div className="px-6 py-5 space-y-4">
+              <div className="px-4 sm:px-6 py-5 space-y-4">
                 {formError && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{formError}</p>}
 
                 <div className="bg-purple-50 border border-purple-200 rounded-xl p-3">
@@ -206,36 +221,30 @@ export default function Proforma() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">Prospect</label>
-                    <select value={prospectId} onChange={e => setProspectId(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                      <option value="">— Aucun —</option>
-                      {leads.filter(l => l.stage !== 'PERDU').map((l: any) => (
-                        <option key={l.id} value={l.id}>{l.reference} — {l.companyName || l.contactName}</option>
-                      ))}
-                    </select>
+                    <Select value={prospectId} onChange={v => setProspectId(v)}
+                      options={leads.filter(l => l.stage !== 'PERDU').map((l: any) => ({ value: l.id, label: `${l.reference} — ${l.companyName || l.contactName}` }))}
+                      placeholder="— Aucun —" className="w-full" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">ou Client existant</label>
-                    <select value={clientId} onChange={e => setClientId(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                      <option value="">— Aucun —</option>
-                      {clients.map((c: any) => <option key={c.id} value={c.id}>{c.code ? `[${c.code}] ` : ''}{c.name}</option>)}
-                    </select>
+                    <Select value={clientId} onChange={v => setClientId(v)}
+                      options={clients.map((c: any) => ({ value: c.id, label: `${c.code ? `[${c.code}] ` : ''}${c.name}` }))}
+                      placeholder="— Aucun —" className="w-full" />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Date d'échéance *</label>
-                  <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} required
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                  <DatePicker value={dueDate} onChange={v => setDueDate(v)} className="w-full" />
                 </div>
 
                 {/* Lines */}
                 <div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Lignes de la proforma</p>
+                  <div className="overflow-x-auto">
                   <table className="w-full text-sm border-collapse mb-2">
                     <thead>
                       <tr className="bg-slate-50">
@@ -250,13 +259,17 @@ export default function Proforma() {
                       {lines.map((line, idx) => (
                         <tr key={idx} className="border-b border-slate-100">
                           <td className="px-2 py-1.5">
-                            <select value={line.description} onChange={e => setLine(idx, 'description', e.target.value)}
-                              className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                              <option value="">-- Choisir une désignation --</option>
-                              {catalog.map((s: any) => (
-                                <option key={s.id} value={`[${s.code}] ${s.description}`}>{s.code} — {s.description}</option>
-                              ))}
-                            </select>
+                            <Select value={line.description} onChange={v => {
+                              setLine(idx, 'description', v)
+                              const matched = catalog.find((s: any) => `[${s.code}] ${s.description}` === v)
+                              if (matched && matched.unitPrice) {
+                                setLine(idx, 'unitPrice', Number(matched.unitPrice))
+                              }
+                            }}
+                              size="sm"
+                              placeholder="-- Choisir une désignation --"
+                              options={catalog.map((s: any) => ({ value: `[${s.code}] ${s.description}`, label: `${s.code} — ${s.description}` }))}
+                              className="w-full" />
                           </td>
                           <td className="px-2 py-1.5">
                             <input type="number" min={1} value={line.quantity} onChange={e => setLine(idx, 'quantity', e.target.value)}
@@ -281,11 +294,12 @@ export default function Proforma() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                   <button type="button" onClick={addLine}
                     className="text-xs font-semibold text-sagard-yellow-dark hover:underline">+ Ajouter une ligne</button>
 
                   <div className="flex justify-end mt-3">
-                    <div className="w-60 space-y-1.5 text-sm">
+                    <div className="w-full sm:w-60 space-y-1.5 text-sm">
                       <div className="flex justify-between font-black text-slate-800 text-base border-t border-slate-200 pt-1.5">
                         <span>TOTAL</span>
                         <span className="text-sagard-yellow-dark">{new Intl.NumberFormat('fr-FR').format(subtotal)} XOF</span>
@@ -302,8 +316,8 @@ export default function Proforma() {
               </div>
 
               {/* Footer */}
-              <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">
-                <button type="button" onClick={() => setShowModal(false)} className="text-sm text-slate-500 hover:text-slate-700">Annuler</button>
+              <div className="px-4 sm:px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">
+                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 bg-white transition-colors">Annuler</button>
                 <button type="submit" disabled={saving}
                   className="flex items-center gap-2 bg-sagard-yellow text-sagard-dark px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark transition-colors disabled:opacity-50">
                   {saving && <Loader2 size={14} className="animate-spin" />}

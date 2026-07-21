@@ -12,6 +12,9 @@ export const endDeployment      = (id: string) => api.post(`/deployments/${id}/e
 export const replaceDeployment  = (id: string, body: { replacementAgentId: string; startDate?: string }) =>
   api.post(`/deployments/${id}/replace`, body).then(r => r.data)
 
+export const transferDeployment = (id: string, body: { toSiteId: string; motif: string; transferDate?: string }) =>
+  api.post(`/deployments/${id}/transfer`, body).then(r => r.data)
+
 // Helpers UI
 export const DEPLOYMENT_ROLES = [
   { value: 'AGENT',                  label: 'Agent de sécurité' },

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Plus, X, Save, Loader2, Phone, Mail, MapPin, ChevronRight,
   TrendingUp, Target, Award, XCircle, ArrowRight, UserPlus,
+  Users, FileText, Handshake, Trophy,
 } from 'lucide-react'
 import { useApi } from '../lib/useApi'
 import {
@@ -13,6 +14,7 @@ import {
 import { getClients } from '../services/clients.service'
 import { getUsers } from '../services/users.service'
 import { isDG } from '../lib/roles'
+import Select from '../components/Select'
 
 type ViewMode = 'kanban' | 'list'
 
@@ -34,13 +36,25 @@ export default function Prospects() {
   return (
     <div className="space-y-5">
       {/* Stats bar */}
-      <div className="grid grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {LEAD_STAGES.map(s => {
           const st = stats.find((x: any) => x.stage === s.value)
+          const iconMap: Record<string, any> = { NOUVEAU: Users, QUALIFIE: Target, PROPOSITION: FileText, NEGOCIATION: Handshake, GAGNE: Trophy, PERDU: XCircle }
+          const Icon = iconMap[s.value] ?? Users
+          const pastelMap: Record<string, string> = {
+            blue: 'bg-blue-50 text-blue-600', indigo: 'bg-indigo-50 text-indigo-600',
+            purple: 'bg-purple-50 text-purple-600', amber: 'bg-amber-50 text-amber-600',
+            green: 'bg-green-50 text-green-600', red: 'bg-red-50 text-red-600',
+          }
           return (
-            <div key={s.value} className={`bg-white border border-slate-200 rounded-xl p-3 text-center`}>
-              <Badge label={s.label} color={s.color} />
-              <p className="text-2xl font-bold text-slate-800 mt-1">{st?.count ?? 0}</p>
+            <div key={s.value} className="bg-white border border-slate-200 rounded-xl p-3 hover:shadow-md hover:-translate-y-0.5 transition-all">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${pastelMap[s.color] ?? 'bg-slate-50 text-slate-600'}`}>
+                  <Icon size={14} />
+                </div>
+                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide truncate">{s.label}</span>
+              </div>
+              <p className="text-2xl font-black text-slate-800">{st?.count ?? 0}</p>
               {st?.totalRevenue > 0 && (
                 <p className="text-[10px] text-slate-400 mt-0.5">
                   {Number(st.totalRevenue).toLocaleString('fr-FR')} XOF
@@ -52,19 +66,19 @@ export default function Prospects() {
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex gap-1.5">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex gap-1.5 bg-slate-100 p-1 rounded-xl">
           <button onClick={() => setView('kanban')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${view === 'kanban' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
+            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === 'kanban' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
             Pipeline
           </button>
           <button onClick={() => setView('list')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${view === 'list' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
+            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === 'list' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
             Liste
           </button>
         </div>
         <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700">
+          className="flex items-center gap-1.5 bg-sagard-yellow text-sagard-dark px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-sagard-yellow-dark transition-colors">
           <Plus size={12} /> Nouveau prospect
         </button>
       </div>
@@ -152,7 +166,7 @@ function LeadCard({ lead, onAdvance, onWin, onLose, userMap }: {
   const canWin = lead.stage === 'NEGOCIATION'
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:shadow transition-shadow">
+    <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
       <div className="flex items-start justify-between gap-2 mb-2">
         <span className="text-[10px] font-mono text-slate-400">{lead.reference}</span>
         {prio && <Badge label={prio.label} color={prio.color} />}
@@ -208,7 +222,7 @@ function ListView({ leads, reload, onConvert, userMap }: { leads: any[]; reload:
       <div className="flex gap-1.5 flex-wrap mb-3">
         {[{ v: 'all', l: 'Tous' }, ...LEAD_STAGES.map(s => ({ v: s.value, l: s.label }))].map(o => (
           <button key={o.v} onClick={() => setFilter(o.v)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${filter === o.v ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${filter === o.v ? 'bg-sagard-yellow text-sagard-dark' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
             {o.l} {o.v !== 'all' && <span className="ml-1 font-bold">{leads.filter(l => l.stage === o.v).length}</span>}
           </button>
         ))}
@@ -219,7 +233,7 @@ function ListView({ leads, reload, onConvert, userMap }: { leads: any[]; reload:
           const svc = LEAD_SERVICE_TYPES.find(t => t.value === lead.serviceType)
           const prio = LEAD_PRIORITIES.find(p => p.value === lead.priority)
           return (
-            <div key={lead.id} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between gap-4">
+            <div key={lead.id} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between gap-4 hover:shadow-md hover:-translate-y-0.5 transition-all">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span className="text-xs font-mono text-slate-400">{lead.reference}</span>
@@ -289,18 +303,17 @@ function CreateLeadModal({ clients, onClose, onCreated }: {
         <Field label="Titre / Objet *">
           <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="input-field" placeholder="Ex: Gardiennage villa Cocody" />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Entreprise">
             <input value={form.companyName} onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))} className="input-field" />
           </Field>
           <Field label="Client existant">
-            <select value={form.clientId} onChange={e => setForm(f => ({ ...f, clientId: e.target.value }))} className="input-field">
-              <option value="">— Nouveau —</option>
-              {clients.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <Select value={form.clientId} onChange={v => setForm(f => ({ ...f, clientId: v }))}
+              options={clients.map((c: any) => ({ value: c.id, label: c.name }))}
+              placeholder="— Nouveau —" className="w-full" />
           </Field>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Field label="Contact">
             <input value={form.contactName} onChange={e => setForm(f => ({ ...f, contactName: e.target.value }))} className="input-field" />
           </Field>
@@ -311,24 +324,21 @@ function CreateLeadModal({ clients, onClose, onCreated }: {
             <input value={form.contactEmail} onChange={e => setForm(f => ({ ...f, contactEmail: e.target.value }))} className="input-field" />
           </Field>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Field label="Type de service">
-            <select value={form.serviceType} onChange={e => setForm(f => ({ ...f, serviceType: e.target.value }))} className="input-field">
-              {LEAD_SERVICE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
+            <Select value={form.serviceType} onChange={v => setForm(f => ({ ...f, serviceType: v }))}
+              options={LEAD_SERVICE_TYPES.map(t => ({ value: t.value, label: t.label }))} className="w-full" />
           </Field>
           <Field label="Source">
-            <select value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))} className="input-field">
-              {LEAD_SOURCES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
+            <Select value={form.source} onChange={v => setForm(f => ({ ...f, source: v }))}
+              options={LEAD_SOURCES.map(s => ({ value: s.value, label: s.label }))} className="w-full" />
           </Field>
           <Field label="Priorité">
-            <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))} className="input-field">
-              {LEAD_PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-            </select>
+            <Select value={form.priority} onChange={v => setForm(f => ({ ...f, priority: v }))}
+              options={LEAD_PRIORITIES.map(p => ({ value: p.value, label: p.label }))} className="w-full" />
           </Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Adresse du site">
             <input value={form.siteAddress} onChange={e => setForm(f => ({ ...f, siteAddress: e.target.value }))} className="input-field" />
           </Field>
@@ -336,7 +346,7 @@ function CreateLeadModal({ clients, onClose, onCreated }: {
             <input value={form.siteCity} onChange={e => setForm(f => ({ ...f, siteCity: e.target.value }))} className="input-field" />
           </Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Agents estimés">
             <input type="number" value={form.nbAgentsEstimated} onChange={e => setForm(f => ({ ...f, nbAgentsEstimated: e.target.value }))} className="input-field" />
           </Field>
@@ -356,22 +366,28 @@ function CreateLeadModal({ clients, onClose, onCreated }: {
 /* ════════════════════════════════════════════════════════════ */
 /*  CONVERT TO CLIENT MODAL                                    */
 /* ════════════════════════════════════════════════════════════ */
-const CLIENT_SEGMENTS = [
-  { value: 'ENTREPRISE_PRIVEE', label: 'Entreprise privée' },
-  { value: 'INSTITUTION_PUBLIQUE', label: 'Institution publique' },
-  { value: 'ONG', label: 'ONG / Organisation internationale' },
-  { value: 'PARTICULIER', label: 'Particulier' },
-  { value: 'AMBASSADE', label: 'Ambassade / Consulat' },
-  { value: 'AUTRE', label: 'Autre' },
-] as const
 
 function ConvertToClientModal({ lead, onClose, onConverted }: {
   lead: any; onClose: () => void; onConverted: (clientId: string) => void
 }) {
+  const customSegments: string[] = (() => {
+    try {
+      const s = localStorage.getItem('sagard_client_segments');
+      return s ? JSON.parse(s) : [
+        'Résidentiel', 'Commercial', 'Industriel', 'Banque / Finance',
+        'Ambassade / Diplomatique', 'Événementiel', 'Administration publique',
+        'Particulier', 'Entreprise privée', 'Institution publique', 'ONG',
+        'Ambassade', 'Autre'
+      ]
+    } catch {
+      return []
+    }
+  })()
+
   const [form, setForm] = useState({
     name: lead.companyName || lead.contactName || '',
     legalName: lead.companyName || '',
-    segment: 'AUTRE',
+    segment: customSegments[0] ?? 'Commercial',
     sector: '',
     taxId: '',
     rccm: '',
@@ -424,7 +440,7 @@ function ConvertToClientModal({ lead, onClose, onConverted }: {
         {error && <p className="text-xs text-red-600 bg-red-50 p-2 rounded-lg">{error}</p>}
 
         {/* Identité */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Nom de l'entreprise *">
             <input value={form.name} onChange={e => set('name', e.target.value)} className="input-field" />
           </Field>
@@ -433,11 +449,10 @@ function ConvertToClientModal({ lead, onClose, onConverted }: {
           </Field>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Field label="Segment">
-            <select value={form.segment} onChange={e => set('segment', e.target.value)} className="input-field">
-              {CLIENT_SEGMENTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
+            <Select value={form.segment} onChange={v => set('segment', v)}
+              options={customSegments.map(s => ({ value: s, label: s }))} className="w-full" />
           </Field>
           <Field label="Secteur d'activité">
             <input value={form.sector} onChange={e => set('sector', e.target.value)} className="input-field" placeholder="Ex: BTP, Banque..." />
@@ -447,7 +462,7 @@ function ConvertToClientModal({ lead, onClose, onConverted }: {
           </Field>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="N° RCCM">
             <input value={form.rccm} onChange={e => set('rccm', e.target.value)} className="input-field" placeholder="Registre du Commerce" />
           </Field>
@@ -457,7 +472,7 @@ function ConvertToClientModal({ lead, onClose, onConverted }: {
         </div>
 
         {/* Contact */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Field label="Téléphone">
             <input value={form.phone} onChange={e => set('phone', e.target.value)} className="input-field" />
           </Field>
@@ -474,7 +489,7 @@ function ConvertToClientModal({ lead, onClose, onConverted }: {
         </Field>
 
         {/* Adresse */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Adresse *">
             <input value={form.address} onChange={e => set('address', e.target.value)} className="input-field" />
           </Field>
@@ -515,7 +530,7 @@ function Btn({ label, onClick, cls, icon }: { label: string; onClick: () => void
 }
 
 function Spinner() { return <div className="flex justify-center py-16"><Loader2 className="animate-spin text-slate-300" size={28} /></div> }
-function Empty({ text }: { text: string }) { return <div className="text-center py-12 text-slate-400 text-sm">{text}</div> }
+function Empty({ text }: { text: string }) { return <div className="text-center py-16 text-slate-400 text-sm flex flex-col items-center gap-2"><Users size={36} className="opacity-20" /><p>{text}</p></div> }
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div><label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>{children}</div>
 }

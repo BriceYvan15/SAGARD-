@@ -1,5 +1,6 @@
-import { Fragment, useState } from 'react'
-import { Search, FileText, Plus, ChevronDown, ChevronUp, Loader2, X, CheckCircle, PlayCircle, PauseCircle, XCircle, Receipt, FileCheck, Info, MapPin, Users as UsersIcon, DollarSign } from 'lucide-react'
+import { Fragment, useState, useMemo } from 'react'
+import { Search, FileText, Plus, ChevronDown, ChevronUp, Loader2, X, CheckCircle, PlayCircle, PauseCircle, XCircle, Receipt, FileCheck, Info, MapPin, Users as UsersIcon, DollarSign, Briefcase, TrendingUp, Clock } from 'lucide-react'
+import Pagination from '../components/Pagination'
 import { fmt, fmtDate } from '../lib/utils'
 import { useApi } from '../lib/useApi'
 import {
@@ -11,6 +12,8 @@ import {
 import { getClients } from '../services/clients.service'
 import { getSites } from '../services/sites.service'
 import { getUsers } from '../services/users.service'
+import Select from '../components/Select'
+import DatePicker from '../components/DatePicker'
 
 const STATUS_CFG: Record<string, { label: string; cls: string }> = {
   BROUILLON: { label: 'Brouillon', cls: 'bg-slate-100 text-slate-600' },
@@ -87,6 +90,8 @@ const MODAL_TABS = [
 export default function Contrats() {
   const [search, setSearch]     = useState('')
   const [filter, setFilter]     = useState('all')
+  const [page, setPage]         = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm]           = useState<any>({ ...EMPTY_FORM })
@@ -114,6 +119,7 @@ export default function Contrats() {
             : e.target.value
     setForm((f: any) => ({ ...f, [k]: v }))
   }
+  const setVal = (k: string) => (v: string) => setForm((f: any) => ({ ...f, [k]: v }))
 
   const filtered = all.filter(c => {
     const q = search.toLowerCase()
@@ -123,6 +129,13 @@ export default function Contrats() {
     const matchFilter = filter === 'all' || c.status === filter
     return matchSearch && matchFilter
   })
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filtered.slice(start, start + pageSize)
+  }, [filtered, page, pageSize])
+
+  const goToPage = (p: number) => setPage(Math.max(1, Math.min(p, Math.ceil(filtered.length / pageSize))))
 
   const stats = {
     total:        all.length,
@@ -187,25 +200,37 @@ export default function Contrats() {
     <div className="space-y-5">
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          {loading ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
-            : <p className="text-2xl font-black text-slate-800">{stats.total}</p>}
-          <p className="text-xs text-slate-500">Total contrats</p>
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0"><Briefcase size={18} className="text-slate-600" /></div>
+          <div>
+            {loading ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
+              : <p className="text-2xl font-black text-slate-800">{stats.total}</p>}
+            <p className="text-xs text-slate-500">Total contrats</p>
+          </div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          {loading ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
-            : <p className="text-2xl font-black text-green-600">{stats.actif}</p>}
-          <p className="text-xs text-slate-500">Contrats actifs</p>
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0"><CheckCircle size={18} className="text-green-600" /></div>
+          <div>
+            {loading ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
+              : <p className="text-2xl font-black text-green-600">{stats.actif}</p>}
+            <p className="text-xs text-slate-500">Contrats actifs</p>
+          </div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-blue-200 bg-blue-50 shadow-sm">
-          {loading ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
-            : <p className="text-2xl font-black text-blue-600">{stats.enCours}</p>}
-          <p className="text-xs text-blue-700">Devis / Proforma / Confirmé</p>
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0"><Clock size={18} className="text-blue-600" /></div>
+          <div>
+            {loading ? <div className="w-10 h-7 bg-slate-200 rounded animate-pulse mb-1" />
+              : <p className="text-2xl font-black text-blue-600">{stats.enCours}</p>}
+            <p className="text-xs text-slate-500">Devis / Proforma / Confirmé</p>
+          </div>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-sagard-yellow shadow-sm">
-          {loading ? <div className="w-16 h-7 bg-slate-200 rounded animate-pulse mb-1" />
-            : <p className="text-lg font-black text-slate-800">{fmt(stats.totalRevenue)}</p>}
-          <p className="text-xs text-slate-500">Revenu mensuel actifs</p>
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0"><TrendingUp size={18} className="text-amber-600" /></div>
+          <div>
+            {loading ? <div className="w-16 h-7 bg-slate-200 rounded animate-pulse mb-1" />
+              : <p className="text-lg font-black text-slate-800">{fmt(stats.totalRevenue)}</p>}
+            <p className="text-xs text-slate-500">Revenu mensuel actifs</p>
+          </div>
         </div>
       </div>
 
@@ -237,15 +262,15 @@ export default function Contrats() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-slate-50 border-b border-slate-100">
                   {['Référence','Client','Intitulé','Type','Agents','Période','Montant/mois','Statut',''].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(ct => {
+                {paginated.map(ct => {
                   const st = STATUS_CFG[ct.status] ?? { label: ct.status, cls: 'bg-slate-100 text-slate-500' }
                   const transitions = ALLOWED[ct.status] ?? {}
                   const isWorking = transitioning === ct.id
@@ -371,6 +396,9 @@ export default function Contrats() {
             )}
           </div>
         )}
+        {filtered.length > 0 && (
+          <Pagination page={page} pageSize={pageSize} total={filtered.length} onPageChange={goToPage} onPageSizeChange={s => { setPageSize(s); setPage(1) }} />
+        )}
       </div>
     </div>
 
@@ -415,33 +443,26 @@ export default function Contrats() {
                 </div>
                 <div className="col-span-3 sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Client *</label>
-                  <select value={form.clientId} onChange={set('clientId')} required
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                    <option value="">Sélectionner...</option>
-                    {clients.map((c: any) => <option key={c.id} value={c.id}>{c.code ? `[${c.code}] ` : ''}{c.name}</option>)}
-                  </select>
+                  <Select value={form.clientId} onChange={setVal('clientId')} required
+                    options={clients.map((c: any) => ({ value: c.id, label: `${c.code ? `[${c.code}] ` : ''}${c.name}` }))}
+                    placeholder="Sélectionner..." className="w-full" />
                 </div>
                 <div className="col-span-3 sm:col-span-1">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Type de prestation *</label>
-                  <select value={form.contractType} onChange={set('contractType')} required
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                    {CONTRACT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
+                  <Select value={form.contractType} onChange={setVal('contractType')} required
+                    options={CONTRACT_TYPES.map(t => ({ value: t.value, label: t.label }))} className="w-full" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Date signature</label>
-                  <input type="date" value={form.signatureDate} onChange={set('signatureDate')}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                  <DatePicker value={form.signatureDate} onChange={setVal('signatureDate')} className="w-full" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Date de début *</label>
-                  <input type="date" value={form.startDate} onChange={set('startDate')} required
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                  <DatePicker value={form.startDate} onChange={setVal('startDate')} className="w-full" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Date de fin</label>
-                  <input type="date" value={form.endDate} onChange={set('endDate')}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                  <DatePicker value={form.endDate} onChange={setVal('endDate')} className="w-full" />
                   <p className="text-[10px] text-slate-400 mt-1">Vide = durée indéterminée</p>
                 </div>
                 <div className="col-span-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
@@ -456,14 +477,10 @@ export default function Contrats() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <label className="block text-xs font-medium text-slate-600 mb-1">Site principal couvert</label>
-                    <select value={form.siteId} onChange={set('siteId')}
+                    <Select value={form.siteId} onChange={setVal('siteId')}
                       disabled={!form.clientId}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white disabled:bg-slate-100 disabled:cursor-not-allowed">
-                      <option value="">— Aucun site —</option>
-                      {filteredSites.map((s: any) => (
-                        <option key={s.id} value={s.id}>{s.name}{s.city ? ` — ${s.city}` : ''}</option>
-                      ))}
-                    </select>
+                      options={filteredSites.map((s: any) => ({ value: s.id, label: `${s.name}${s.city ? ` — ${s.city}` : ''}` }))}
+                      placeholder="— Aucun site —" className="w-full" />
                     <p className="text-[10px] text-slate-400 mt-1">
                       {!form.clientId
                         ? 'Sélectionnez d\'abord un client pour voir ses sites.'
@@ -474,13 +491,9 @@ export default function Contrats() {
                   </div>
                   <div className="col-span-2">
                     <label className="block text-xs font-medium text-slate-600 mb-1">Chargé d'affaires (commercial)</label>
-                    <select value={form.assignedUserId} onChange={set('assignedUserId')}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                      <option value="">— Non assigné —</option>
-                      {commercials.map((u: any) => (
-                        <option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.role})</option>
-                      ))}
-                    </select>
+                    <Select value={form.assignedUserId} onChange={setVal('assignedUserId')}
+                      options={commercials.map((u: any) => ({ value: u.id, label: `${u.firstName} ${u.lastName} (${u.role})` }))}
+                      placeholder="— Non assigné —" className="w-full" />
                     <p className="text-[10px] text-slate-400 mt-1">Recevra les alertes (échéance, expiration, réclamations).</p>
                   </div>
                 </div>
@@ -497,12 +510,8 @@ export default function Contrats() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Vacations *</label>
-                  <select value={form.nbShifts} onChange={set('nbShifts')} required
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                    <option value="ONE">1 vacation (8h)</option>
-                    <option value="TWO">2 vacations (16h)</option>
-                    <option value="THREE">3 vacations (24h/24h)</option>
-                  </select>
+                  <Select value={form.nbShifts} onChange={setVal('nbShifts')} required
+                    options={[{ value: 'ONE', label: '1 vacation (8h)' }, { value: 'TWO', label: '2 vacations (16h)' }, { value: 'THREE', label: '3 vacations (24h/24h)' }]} className="w-full" />
                 </div>
                 <div className="flex items-end">
                   <div className="bg-sagard-yellow/20 border border-sagard-yellow rounded-lg px-3 py-2 w-full">
@@ -527,10 +536,8 @@ export default function Contrats() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Devise</label>
-                  <select value={form.currency} onChange={set('currency')}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                    {CURRENCIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                  </select>
+                  <Select value={form.currency} onChange={setVal('currency')}
+                    options={CURRENCIES.map(c => ({ value: c.value, label: c.label }))} className="w-full" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Frais de mise en place</label>
@@ -539,10 +546,8 @@ export default function Contrats() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Fréquence facturation</label>
-                  <select value={form.invoicingFrequency} onChange={set('invoicingFrequency')}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 bg-white">
-                    {FREQUENCIES.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-                  </select>
+                  <Select value={form.invoicingFrequency} onChange={setVal('invoicingFrequency')}
+                    options={FREQUENCIES.map(f => ({ value: f.value, label: f.label }))} className="w-full" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Délai paiement (j)</label>

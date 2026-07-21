@@ -1,32 +1,85 @@
 import { useState, useEffect } from 'react'
+import { Navigate } from 'react-router-dom'
 import {
   Settings, Building2, Shield, Bell, Palette, Save, Loader2,
-  Check, Globe, Clock, Lock, Database, FileText, Plus, X, Trash2,
+  Check, Globe, Clock, Lock, Database, FileText, Plus, X, Trash2, Users, Calculator, MapPin, Download, RefreshCw,
 } from 'lucide-react'
 import { hasAccess } from '../lib/roles'
 import { getUser, ROLE_LABELS } from '../lib/auth'
 
-type Tab = 'entreprise' | 'securite' | 'notifications' | 'systeme' | 'facturation'
+import { getSettings, updateSettings, backupDatabase } from '../services/settings.service'
+import { getServiceCatalog, createCatalogItem, updateCatalogItem, deleteCatalogItem, resetCatalog } from '../services/invoices.service'
+import { getAccounts, createAccount, deleteAccount, resetAccounts } from '../services/accounting.service'
+import toast from 'react-hot-toast'
+
+type Tab = 'entreprise' | 'facturation' | 'comptabilite' | 'clients' | 'sites' | 'securite' | 'notifications' | 'systeme'
 
 const TABS: { id: Tab; label: string; icon: any }[] = [
-  { id: 'entreprise',    label: 'Entreprise',    icon: Building2 },
-  { id: 'facturation',   label: 'Facturation',   icon: FileText },
-  { id: 'securite',      label: 'Sécurité',      icon: Shield },
-  { id: 'notifications', label: 'Notifications', icon: Bell },
-  { id: 'systeme',       label: 'Système',       icon: Database },
+  { id: 'entreprise',    label: 'Entreprise',     icon: Building2 },
+  { id: 'facturation',   label: 'Facturation',    icon: FileText },
+  { id: 'comptabilite',  label: 'Comptabilité',   icon: Calculator },
+  { id: 'clients',       label: 'Clients',        icon: Users },
+  { id: 'sites',         label: 'Sites',          icon: MapPin },
+  { id: 'securite',      label: 'Sécurité',       icon: Shield },
+  { id: 'notifications', label: 'Notifications',  icon: Bell },
+  { id: 'systeme',       label: 'Système',        icon: Database },
 ]
 
 export default function Parametres() {
+  if (!hasAccess('parametres')) {
+    return <Navigate to="/" replace />
+  }
+
   const [activeTab, setActiveTab] = useState<Tab>('entreprise')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [loadingSettings, setLoadingSettings] = useState(true)
   const user = getUser()
+
+  // Company settings state — shared with EntrepriseTab
+  const [companyName, setCompanyName] = useState('SAGARD SÉCURITÉ')
+  const [companyPhone, setCompanyPhone] = useState('')
+  const [companyEmail, setCompanyEmail] = useState('')
+  const [companyAddress, setCompanyAddress] = useState("Abidjan, Côte d'Ivoire")
+  const [rccm, setRccm] = useState('')
+  const [ncc, setNcc] = useState('')
+
+  // Load settings from database on mount
+  useEffect(() => {
+    getSettings()
+      .then((s: any) => {
+        if (s) {
+          setCompanyName(s.name || 'SAGARD SÉCURITÉ')
+          setCompanyPhone(s.phone || '')
+          setCompanyEmail(s.email || '')
+          setCompanyAddress(s.address || "Abidjan, Côte d'Ivoire")
+          setRccm(s.rccm || '')
+          setNcc(s.ncc || '')
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingSettings(false))
+  }, [])
 
   const handleSave = async () => {
     setSaving(true)
-    await new Promise(r => setTimeout(r, 800))
-    setSaving(false); setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    try {
+      await updateSettings({
+        name: companyName,
+        phone: companyPhone,
+        email: companyEmail,
+        address: companyAddress,
+        rccm,
+        ncc,
+      })
+      setSaved(true)
+      toast.success('Paramètres enregistrés avec succès')
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Erreur lors de la sauvegarde')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -43,23 +96,34 @@ export default function Parametres() {
         </button>
       </div>
 
-      <div className="flex gap-6">
+      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
         {/* Sidebar tabs */}
-        <div className="w-56 space-y-1 flex-shrink-0">
+        <div className="flex gap-1 overflow-x-auto sm:overflow-x-visible sm:flex-col sm:w-56 sm:space-y-1 sm:flex-shrink-0">
           {TABS.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                activeTab === tab.id ? 'bg-sagard-yellow text-sagard-dark' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-              }`}>
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-sagard-yellow text-sagard-dark' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}>
               <tab.icon size={16} /> {tab.label}
             </button>
           ))}
         </div>
 
         {/* Content */}
-        <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-          {activeTab === 'entreprise' && <EntrepriseTab />}
+        <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-6 max-h-[calc(100vh-180px)] overflow-y-auto">
+          {activeTab === 'entreprise' && (
+            <EntrepriseTab
+              companyName={companyName} setCompanyName={setCompanyName}
+              companyPhone={companyPhone} setCompanyPhone={setCompanyPhone}
+              companyEmail={companyEmail} setCompanyEmail={setCompanyEmail}
+              companyAddress={companyAddress} setCompanyAddress={setCompanyAddress}
+              rccm={rccm} setRccm={setRccm}
+              ncc={ncc} setNcc={setNcc}
+              loading={loadingSettings}
+            />
+          )}
           {activeTab === 'facturation' && <FacturationTab />}
+          {activeTab === 'comptabilite' && <ComptabiliteTab />}
+          {activeTab === 'clients' && <ClientsTab />}
+          {activeTab === 'sites' && <SitesTab />}
           {activeTab === 'securite' && <SecuriteTab />}
           {activeTab === 'notifications' && <NotificationsTab />}
           {activeTab === 'systeme' && <SystemeTab />}
@@ -105,18 +169,33 @@ function Toggle({ label, sub, checked, onChange }: { label: string; sub: string;
   )
 }
 
-function EntrepriseTab() {
-  const [companyName, setCompanyName] = useState('SAGARD SÉCURITÉ')
-  const [companyPhone, setCompanyPhone] = useState('')
-  const [companyEmail, setCompanyEmail] = useState('')
-  const [companyAddress, setCompanyAddress] = useState('Abidjan, Côte d\'Ivoire')
-  const [rccm, setRccm] = useState('')
-  const [ncc, setNcc] = useState('')
+function EntrepriseTab({
+  companyName, setCompanyName,
+  companyPhone, setCompanyPhone,
+  companyEmail, setCompanyEmail,
+  companyAddress, setCompanyAddress,
+  rccm, setRccm,
+  ncc, setNcc,
+  loading,
+}: {
+  companyName: string; setCompanyName: (v: string) => void
+  companyPhone: string; setCompanyPhone: (v: string) => void
+  companyEmail: string; setCompanyEmail: (v: string) => void
+  companyAddress: string; setCompanyAddress: (v: string) => void
+  rccm: string; setRccm: (v: string) => void
+  ncc: string; setNcc: (v: string) => void
+  loading: boolean
+}) {
+  if (loading) return (
+    <div className="flex justify-center py-12">
+      <Loader2 className="animate-spin text-slate-300" size={24} />
+    </div>
+  )
 
   return (
     <div className="space-y-6">
-      <SectionTitle icon={Building2} title="Informations de l'entreprise" sub="Données affichées sur les documents officiels" />
-      <div className="grid grid-cols-2 gap-4">
+      <SectionTitle icon={Building2} title="Informations de l'entreprise" sub="Données affichées sur les documents officiels et utilisées pour l'envoi d'e-mails" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Raison sociale" value={companyName} onChange={setCompanyName} />
         <Field label="Téléphone" value={companyPhone} onChange={setCompanyPhone} />
         <Field label="Email" value={companyEmail} onChange={setCompanyEmail} type="email" />
@@ -137,7 +216,7 @@ function SecuriteTab() {
   return (
     <div className="space-y-6">
       <SectionTitle icon={Lock} title="Sécurité des comptes" sub="Politique de mots de passe et sessions" />
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Longueur minimum mot de passe" value={minPwd} onChange={setMinPwd} type="number" />
         <Field label="Timeout session (minutes)" value={sessionTimeout} onChange={setSessionTimeout} type="number" />
       </div>
@@ -171,101 +250,332 @@ function NotificationsTab() {
 }
 
 function FacturationTab() {
-  const STORAGE_KEY_DESIG = 'sagard_invoice_designations'
-  const STORAGE_KEY_ACCTS = 'sagard_accounting_accounts'
+  const STORAGE_KEY = 'sagard_invoice_designations'
 
-  const defaultDesignations = [
-    'Gardiennage statique',
-    'Gardiennage mobile / Patrouille',
-    'Protection rapprochée VIP',
-    'Surveillance événementielle',
-    'Escorte de fonds',
-    'Installation vidéosurveillance',
-    'Maintenance système de sécurité',
-    'Formation sécurité',
-    'Frais de mise en service',
-  ]
+  const [catalog, setCatalog] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [newDesc, setNewDesc] = useState('')
+  const [newPrice, setNewPrice] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editPrice, setEditPrice] = useState('')
 
-  const defaultAccounts = [
-    { code: '411', label: 'Clients' },
-    { code: '512', label: 'Banque' },
-    { code: '531', label: 'Caisse' },
-    { code: '601', label: 'Achats de matières' },
-    { code: '613', label: 'Locations' },
-    { code: '641', label: 'Rémunérations du personnel' },
-    { code: '706', label: 'Prestations de services' },
-  ]
+  const loadCatalog = async () => {
+    setLoading(true)
+    try {
+      const data = await getServiceCatalog()
+      setCatalog(data)
+    } catch { toast.error('Erreur lors du chargement du catalogue') }
+    setLoading(false)
+  }
 
-  const [designations, setDesignations] = useState<string[]>(() => {
-    try { const s = localStorage.getItem(STORAGE_KEY_DESIG); return s ? JSON.parse(s) : defaultDesignations }
-    catch { return defaultDesignations }
-  })
-  const [accounts, setAccounts] = useState<{ code: string; label: string }[]>(() => {
-    try { const s = localStorage.getItem(STORAGE_KEY_ACCTS); return s ? JSON.parse(s) : defaultAccounts }
-    catch { return defaultAccounts }
-  })
-  const [newDesig, setNewDesig] = useState('')
-  const [newAcctCode, setNewAcctCode] = useState('')
-  const [newAcctLabel, setNewAcctLabel] = useState('')
+  useEffect(() => { loadCatalog() }, [])
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEY_DESIG, JSON.stringify(designations)) }, [designations])
-  useEffect(() => { localStorage.setItem(STORAGE_KEY_ACCTS, JSON.stringify(accounts)) }, [accounts])
+  const handleAdd = async () => {
+    if (!newDesc.trim()) return
+    try {
+      const code = newDesc.trim().slice(0, 10).toUpperCase().replace(/\s/g, '_').replace(/[^A-Z0-9_]/g, '')
+      await createCatalogItem({ code: `${code}_${Date.now().toString().slice(-4)}`, description: newDesc.trim(), unitPrice: newPrice ? Number(newPrice) : undefined })
+      setNewDesc(''); setNewPrice('')
+      toast.success('Désignation ajoutée')
+      loadCatalog()
+    } catch { toast.error('Erreur lors de l\'ajout') }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteCatalogItem(id)
+      toast.success('Désignation supprimée')
+      loadCatalog()
+    } catch { toast.error('Erreur lors de la suppression') }
+  }
+
+  const handleSavePrice = async (id: string) => {
+    try {
+      await updateCatalogItem(id, { unitPrice: Number(editPrice) })
+      setEditingId(null); setEditPrice('')
+      toast.success('Prix mis à jour')
+      loadCatalog()
+    } catch { toast.error('Erreur lors de la mise à jour') }
+  }
+
+  const handleReset = async () => {
+    if (!confirm('Voulez-vous vraiment réinitialiser le catalogue avec la liste par défaut ? Les modifications seront perdues.')) return
+    try {
+      await resetCatalog()
+      toast.success('Catalogue réinitialisé')
+      loadCatalog()
+    } catch { toast.error('Erreur lors de la réinitialisation') }
+  }
+
+  const customDesignations: string[] = (() => {
+    try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : [] }
+    catch { return [] }
+  })()
 
   return (
-    <div className="space-y-8">
-      {/* Désignations factures */}
-      <div>
-        <SectionTitle icon={FileText} title="Désignations de facturation" sub="Éléments disponibles dans la liste déroulante lors de la création de factures" />
-        <div className="space-y-2 mb-4">
-          {designations.map((d, i) => (
-            <div key={i} className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-2.5 group">
-              <span className="text-sm text-slate-700">{d}</span>
-              <button onClick={() => setDesignations(prev => prev.filter((_, idx) => idx !== i))}
+    <div className="space-y-5">
+      <SectionTitle icon={FileText} title="Désignations de facturation" sub="Éléments disponibles dans la liste déroulante lors de la création de factures, devis et proforma" />
+
+      <div className="flex justify-end">
+        <button onClick={handleReset} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+          <RefreshCw size={12} /> Réinitialiser la liste par défaut
+        </button>
+      </div>
+
+      <div className="border border-slate-200 rounded-xl p-4">
+        {loading ? (
+          <div className="flex justify-center py-8"><Loader2 className="animate-spin text-slate-300" size={24} /></div>
+        ) : (
+          <div className="space-y-1.5 mb-4 max-h-[calc(100vh-420px)] overflow-y-auto pr-1">
+            {catalog.map((item) => (
+              <div key={item.id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 group">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <span className="text-xs font-mono bg-slate-200 text-slate-700 px-2 py-0.5 rounded shrink-0">{item.code}</span>
+                  <span className="text-sm text-slate-700 truncate">{item.description}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {editingId === item.id ? (
+                    <>
+                      <input type="number" value={editPrice} onChange={e => setEditPrice(e.target.value)}
+                        className="w-28 px-2 py-1 text-xs border border-slate-200 rounded-lg text-right focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40"
+                        placeholder="Prix XOF" />
+                      <button onClick={() => handleSavePrice(item.id)} className="text-green-600 hover:text-green-700 p-1"><Check size={14} /></button>
+                      <button onClick={() => { setEditingId(null); setEditPrice('') }} className="text-slate-400 hover:text-slate-600 p-1"><X size={14} /></button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xs font-semibold text-slate-600">
+                        {item.unitPrice ? `${new Intl.NumberFormat('fr-FR').format(Number(item.unitPrice))} XOF` : '—'}
+                      </span>
+                      <button onClick={() => { setEditingId(item.id); setEditPrice(item.unitPrice ? String(Number(item.unitPrice)) : '') }}
+                        className="opacity-0 group-hover:opacity-100 text-blue-400 hover:text-blue-600 transition-opacity p-1 text-xs">Modifier</button>
+                      <button onClick={() => handleDelete(item.id)}
+                        className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity p-1 rounded">
+                        <Trash2 size={14} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+            {catalog.length === 0 && <p className="text-sm text-slate-400 italic">Aucune désignation dans le catalogue</p>}
+          </div>
+        )}
+
+        <div className="border-t border-slate-100 pt-3">
+          <div className="flex gap-2">
+            <input value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Nouvelle désignation..."
+              onKeyDown={e => { if (e.key === 'Enter' && newDesc.trim()) handleAdd() }}
+              className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sagard-yellow/40 focus:outline-none" />
+            <input value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="Prix XOF"
+              type="number"
+              onKeyDown={e => { if (e.key === 'Enter' && newDesc.trim()) handleAdd() }}
+              className="w-32 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sagard-yellow/40 focus:outline-none" />
+            <button onClick={handleAdd} disabled={!newDesc.trim()}
+              className="flex items-center gap-1 px-4 py-2 bg-sagard-yellow text-sagard-dark rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark disabled:opacity-50">
+              <Plus size={14} /> Ajouter
+            </button>
+          </div>
+          {customDesignations.length > 0 && (
+            <p className="text-xs text-slate-400 mt-2 italic">
+              {customDesignations.length} désignation(s) personnalisée(s) locale(s) — elles apparaissent aussi dans les listes déroulantes
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ComptabiliteTab() {
+  const [items, setItems] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [newCode, setNewCode] = useState('')
+  const [newLabel, setNewLabel] = useState('')
+  const [resetting, setResetting] = useState(false)
+
+  const load = () => {
+    setLoading(true)
+    getAccounts().then((data: any[]) => setItems(data)).catch(() => {}).finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [])
+
+  const handleAdd = async () => {
+    if (!newCode.trim() || !newLabel.trim()) return
+    try {
+      await createAccount({ code: newCode.trim(), label: newLabel.trim() })
+      setNewCode(''); setNewLabel('')
+      load()
+      toast.success('Compte ajouté')
+    } catch { toast.error('Erreur lors de l\'ajout') }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteAccount(id)
+      load()
+      toast.success('Compte supprimé')
+    } catch { toast.error('Erreur lors de la suppression') }
+  }
+
+  const handleReset = async () => {
+    setResetting(true)
+    try {
+      await resetAccounts()
+      load()
+      toast.success('Plan comptable réinitialisé')
+    } catch { toast.error('Erreur lors de la réinitialisation') }
+    finally { setResetting(false) }
+  }
+
+  return (
+    <div className="space-y-5">
+      <SectionTitle icon={Calculator} title="Plan comptable" sub="Comptes disponibles pour la saisie comptable (journal des opérations, dépenses)" />
+      <div className="border border-slate-200 rounded-xl p-4">
+        <div className="flex justify-between items-center mb-3">
+          <span className="text-xs text-slate-500">{loading ? 'Chargement...' : `${items.length} comptes`}</span>
+          <button onClick={handleReset} disabled={resetting}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50">
+            {resetting ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            Réinitialiser
+          </button>
+        </div>
+        <div className="space-y-1.5 mb-4 max-h-[calc(100vh-380px)] overflow-y-auto pr-1">
+          {items.map((a) => (
+            <div key={a.id} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 group">
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono bg-slate-200 text-slate-700 px-2 py-0.5 rounded">{a.code}</span>
+                <span className="text-sm text-slate-700">{a.label}</span>
+              </div>
+              <button onClick={() => handleDelete(a.id)}
                 className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity p-1 rounded">
                 <Trash2 size={14} />
               </button>
             </div>
           ))}
-          {designations.length === 0 && <p className="text-sm text-slate-400 italic">Aucune désignation configurée</p>}
+          {items.length === 0 && !loading && <p className="text-sm text-slate-400 italic">Aucun compte configuré. Cliquez sur "Réinitialiser" pour charger le plan par défaut.</p>}
         </div>
         <div className="flex gap-2">
-          <input value={newDesig} onChange={e => setNewDesig(e.target.value)} placeholder="Nouvelle désignation..."
-            onKeyDown={e => { if (e.key === 'Enter' && newDesig.trim()) { setDesignations(prev => [...prev, newDesig.trim()]); setNewDesig('') } }}
+          <input value={newCode} onChange={e => setNewCode(e.target.value)} placeholder="Code (ex: 706)"
+            className="w-28 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sagard-yellow/40 focus:outline-none" />
+          <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Libellé du compte..."
+            onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
             className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sagard-yellow/40 focus:outline-none" />
-          <button onClick={() => { if (newDesig.trim()) { setDesignations(prev => [...prev, newDesig.trim()]); setNewDesig('') } }}
-            disabled={!newDesig.trim()}
+          <button onClick={handleAdd}
+            disabled={!newCode.trim() || !newLabel.trim()}
             className="flex items-center gap-1 px-4 py-2 bg-sagard-yellow text-sagard-dark rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark disabled:opacity-50">
             <Plus size={14} /> Ajouter
           </button>
         </div>
       </div>
+    </div>
+  )
+}
 
-      {/* Comptes comptables */}
-      <div>
-        <SectionTitle icon={Database} title="Plan comptable" sub="Comptes disponibles pour la saisie comptable (journal, dépenses)" />
-        <div className="space-y-2 mb-4">
-          {accounts.map((a, i) => (
-            <div key={i} className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-2.5 group">
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-mono bg-slate-200 text-slate-700 px-2 py-0.5 rounded">{a.code}</span>
-                <span className="text-sm text-slate-700">{a.label}</span>
-              </div>
-              <button onClick={() => setAccounts(prev => prev.filter((_, idx) => idx !== i))}
-                className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity p-1 rounded">
-                <Trash2 size={14} />
+function ClientsTab() {
+  const STORAGE_KEY = 'sagard_client_segments'
+
+  const defaults = [
+    'Résidentiel',
+    'Commercial',
+    'Industriel',
+    'Banque / Finance',
+    'Ambassade / Diplomatique',
+    'Événementiel',
+    'Administration publique',
+    'Particulier',
+    'Entreprise privée',
+    'Institution publique',
+    'ONG',
+    'Ambassade',
+    'Autre',
+  ]
+
+  const [items, setItems] = useState<string[]>(() => {
+    try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : defaults }
+    catch { return defaults }
+  })
+  const [newItem, setNewItem] = useState('')
+
+  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)) }, [items])
+
+  return (
+    <div className="space-y-5">
+      <SectionTitle icon={Users} title="Segments clients" sub="Segments disponibles dans la liste déroulante lors de l'enregistrement ou la modification de clients et prospects" />
+      <div className="border border-slate-200 rounded-xl p-4">
+        <div className="flex flex-wrap gap-1.5 mb-4 max-h-[calc(100vh-340px)] overflow-y-auto pr-1">
+          {items.map((s, i) => (
+            <span key={i} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-xs rounded-full pl-3 pr-1 py-1 group">
+              {s}
+              <button onClick={() => setItems(prev => prev.filter((_, idx) => idx !== i))}
+                className="text-slate-300 hover:text-red-500 rounded-full p-0.5 transition-colors">
+                <X size={12} />
               </button>
-            </div>
+            </span>
           ))}
-          {accounts.length === 0 && <p className="text-sm text-slate-400 italic">Aucun compte configuré</p>}
+          {items.length === 0 && <p className="text-xs text-slate-400 italic">Aucun segment</p>}
         </div>
         <div className="flex gap-2">
-          <input value={newAcctCode} onChange={e => setNewAcctCode(e.target.value)} placeholder="Code (ex: 706)"
-            className="w-24 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sagard-yellow/40 focus:outline-none" />
-          <input value={newAcctLabel} onChange={e => setNewAcctLabel(e.target.value)} placeholder="Libellé du compte..."
-            onKeyDown={e => { if (e.key === 'Enter' && newAcctCode.trim() && newAcctLabel.trim()) { setAccounts(prev => [...prev, { code: newAcctCode.trim(), label: newAcctLabel.trim() }]); setNewAcctCode(''); setNewAcctLabel('') } }}
+          <input value={newItem} onChange={e => setNewItem(e.target.value)} placeholder="Nouveau segment..."
+            onKeyDown={e => { if (e.key === 'Enter' && newItem.trim()) { setItems(prev => [...prev, newItem.trim()]); setNewItem('') } }}
             className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sagard-yellow/40 focus:outline-none" />
-          <button onClick={() => { if (newAcctCode.trim() && newAcctLabel.trim()) { setAccounts(prev => [...prev, { code: newAcctCode.trim(), label: newAcctLabel.trim() }]); setNewAcctCode(''); setNewAcctLabel('') } }}
-            disabled={!newAcctCode.trim() || !newAcctLabel.trim()}
+          <button onClick={() => { if (newItem.trim()) { setItems(prev => [...prev, newItem.trim()]); setNewItem('') } }}
+            disabled={!newItem.trim()}
+            className="flex items-center gap-1 px-4 py-2 bg-sagard-yellow text-sagard-dark rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark disabled:opacity-50">
+            <Plus size={14} /> Ajouter
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SitesTab() {
+  const STORAGE_KEY = 'sagard_site_types'
+
+  const defaults = [
+    'Villa / Résidence',
+    'Immeuble',
+    'Entrepôt',
+    'Usine',
+    'Bureau',
+    'Commerce',
+    'Banque / Agence',
+    'Chantier',
+    'Autre',
+  ]
+
+  const [items, setItems] = useState<string[]>(() => {
+    try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : defaults }
+    catch { return defaults }
+  })
+  const [newItem, setNewItem] = useState('')
+
+  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)) }, [items])
+
+  return (
+    <div className="space-y-5">
+      <SectionTitle icon={MapPin} title="Types de sites gardiennés" sub="Types de sites disponibles dans la liste déroulante lors de la création ou modification d'un site" />
+      <div className="border border-slate-200 rounded-xl p-4">
+        <div className="flex flex-wrap gap-1.5 mb-4 max-h-[calc(100vh-340px)] overflow-y-auto pr-1">
+          {items.map((s, i) => (
+            <span key={i} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-xs rounded-full pl-3 pr-1 py-1 group">
+              {s}
+              <button onClick={() => setItems(prev => prev.filter((_, idx) => idx !== i))}
+                className="text-slate-300 hover:text-red-500 rounded-full p-0.5 transition-colors">
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+          {items.length === 0 && <p className="text-xs text-slate-400 italic">Aucun type de site</p>}
+        </div>
+        <div className="flex gap-2">
+          <input value={newItem} onChange={e => setNewItem(e.target.value)} placeholder="Nouveau type de site..."
+            onKeyDown={e => { if (e.key === 'Enter' && newItem.trim()) { setItems(prev => [...prev, newItem.trim()]); setNewItem('') } }}
+            className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-sagard-yellow/40 focus:outline-none" />
+          <button onClick={() => { if (newItem.trim()) { setItems(prev => [...prev, newItem.trim()]); setNewItem('') } }}
+            disabled={!newItem.trim()}
             className="flex items-center gap-1 px-4 py-2 bg-sagard-yellow text-sagard-dark rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark disabled:opacity-50">
             <Plus size={14} /> Ajouter
           </button>
@@ -276,10 +586,24 @@ function FacturationTab() {
 }
 
 function SystemeTab() {
+  const [backingUp, setBackingUp] = useState(false)
+
+  const handleBackup = async () => {
+    setBackingUp(true)
+    try {
+      await backupDatabase()
+      toast.success('Backup téléchargé avec succès')
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Erreur lors du backup')
+    } finally {
+      setBackingUp(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <SectionTitle icon={Database} title="Informations système" sub="Détails techniques de la plateforme" />
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-slate-50 rounded-xl p-4">
           <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">Version</p>
           <p className="text-sm font-bold text-slate-700">SAGARD ERP v1.0.0</p>
@@ -297,6 +621,22 @@ function SystemeTab() {
           <p className="text-sm font-bold text-slate-700">NestJS v10</p>
         </div>
       </div>
+
+      {/* Backup section */}
+      <div className="border border-slate-200 rounded-xl p-5">
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2"><Database size={16} /> Sauvegarde de la base de données</h3>
+            <p className="text-xs text-slate-400 mt-1">Télécharger un dump SQL complet de la base de données de production</p>
+          </div>
+          <button onClick={handleBackup} disabled={backingUp}
+            className="flex items-center gap-2 bg-sagard-yellow text-sagard-dark px-4 py-2 rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark disabled:opacity-50 transition-colors">
+            {backingUp ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            {backingUp ? 'Sauvegarde...' : 'Télécharger le backup'}
+          </button>
+        </div>
+      </div>
+
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-4">
         <p className="text-sm font-bold text-amber-700 flex items-center gap-2"><Globe size={14} /> Fuseau horaire</p>
         <p className="text-xs text-amber-600 mt-1">Afrique/Abidjan (UTC+0)</p>

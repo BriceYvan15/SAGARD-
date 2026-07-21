@@ -8,6 +8,7 @@ import { getVisitors, createVisitor, checkOutVisitor, VISIT_PURPOSES, ID_DOC_TYP
 import { getKeys, createKey, issueKey, returnKey, KEY_TYPES, KEY_STATES } from '../services/keys.service'
 import { getSiteEquipments, createSiteEquipment, assignEquipment, returnEquipment, EQUIPMENT_CATEGORIES, EQUIPMENT_STATES } from '../services/site-equipment.service'
 import { getSites } from '../services/sites.service'
+import Select from '../components/Select'
 
 type Tab = 'visitors' | 'keys' | 'equipment'
 
@@ -26,9 +27,14 @@ export default function Registres() {
         {TABS.map(t => {
           const Icon = t.icon
           const active = tab === t.key
+          const pastelMap: Record<string, string> = {
+            indigo: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+            amber: 'bg-amber-50 text-amber-700 border-amber-200',
+            teal: 'bg-teal-50 text-teal-700 border-teal-200',
+          }
           return (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${active ? `bg-${t.color}-50 text-${t.color}-700 border border-${t.color}-200 shadow-sm` : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${active ? `${pastelMap[t.color] ?? 'bg-slate-50 text-slate-700 border-slate-200'} shadow-sm` : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:shadow-sm'}`}>
               <Icon size={15} /> {t.label}
             </button>
           )
@@ -89,7 +95,7 @@ function VisitorsPanel() {
       {loading ? <Spinner /> : (
         <div className="space-y-2">
           {visitors.map(v => (
-            <div key={v.id} className={`bg-white border rounded-xl p-4 flex items-center justify-between gap-4 ${v.isBlacklisted ? 'border-red-300 bg-red-50/30' : 'border-slate-200'}`}>
+            <div key={v.id} className={`bg-white border rounded-xl p-4 flex items-center justify-between gap-4 hover:shadow-md transition-all ${v.isBlacklisted ? 'border-red-300 bg-red-50/30' : 'border-slate-200'}`}>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span className="text-xs font-mono text-slate-400">{v.reference}</span>
@@ -119,12 +125,11 @@ function VisitorsPanel() {
         <Modal title="Enregistrer un visiteur" onClose={() => setShowCreate(false)}>
           <div className="space-y-3 p-5">
             <Field label="Site *">
-              <select value={form.siteId} onChange={e => setForm(f => ({ ...f, siteId: e.target.value }))} className="input-field">
-                <option value="">— Sélectionner —</option>
-                {sites.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              <Select value={form.siteId} onChange={v => setForm(f => ({ ...f, siteId: v }))}
+                options={sites.map((s: any) => ({ value: s.id, label: s.name }))}
+                placeholder="— Sélectionner —" className="w-full" />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Nom du visiteur *">
                 <input value={form.visitorName} onChange={e => setForm(f => ({ ...f, visitorName: e.target.value }))} className="input-field" />
               </Field>
@@ -132,11 +137,10 @@ function VisitorsPanel() {
                 <input value={form.visitorCompany} onChange={e => setForm(f => ({ ...f, visitorCompany: e.target.value }))} className="input-field" />
               </Field>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Field label="Type pièce">
-                <select value={form.idType} onChange={e => setForm(f => ({ ...f, idType: e.target.value }))} className="input-field">
-                  {ID_DOC_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
+                <Select value={form.idType} onChange={v => setForm(f => ({ ...f, idType: v }))}
+                  options={ID_DOC_TYPES.map(t => ({ value: t.value, label: t.label }))} className="w-full" />
               </Field>
               <Field label="N° pièce">
                 <input value={form.idNumber} onChange={e => setForm(f => ({ ...f, idNumber: e.target.value }))} className="input-field" />
@@ -145,17 +149,16 @@ function VisitorsPanel() {
                 <input value={form.visitorPhone} onChange={e => setForm(f => ({ ...f, visitorPhone: e.target.value }))} className="input-field" />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Motif">
-                <select value={form.visitPurpose} onChange={e => setForm(f => ({ ...f, visitPurpose: e.target.value }))} className="input-field">
-                  {VISIT_PURPOSES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                </select>
+                <Select value={form.visitPurpose} onChange={v => setForm(f => ({ ...f, visitPurpose: v }))}
+                  options={VISIT_PURPOSES.map(p => ({ value: p.value, label: p.label }))} className="w-full" />
               </Field>
               <Field label="Personne visitée">
                 <input value={form.hostName} onChange={e => setForm(f => ({ ...f, hostName: e.target.value }))} className="input-field" />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Immatriculation">
                 <input value={form.plateNumber} onChange={e => setForm(f => ({ ...f, plateNumber: e.target.value }))} className="input-field" />
               </Field>
@@ -227,7 +230,7 @@ function KeysPanel() {
             const st = KEY_STATES.find(s => s.value === k.state)
             const tp = KEY_TYPES.find(t => t.value === k.keyType)
             return (
-              <div key={k.id} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between gap-4">
+              <div key={k.id} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between gap-4 hover:shadow-md transition-all">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="text-xs font-mono text-slate-400">{k.code}</span>
@@ -256,12 +259,11 @@ function KeysPanel() {
         <Modal title="Ajouter une clé" onClose={() => setShowCreate(false)}>
           <div className="space-y-3 p-5">
             <Field label="Site *">
-              <select value={form.siteId} onChange={e => setForm(f => ({ ...f, siteId: e.target.value }))} className="input-field">
-                <option value="">— Sélectionner —</option>
-                {sites.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              <Select value={form.siteId} onChange={v => setForm(f => ({ ...f, siteId: v }))}
+                options={sites.map((s: any) => ({ value: s.id, label: s.name }))}
+                placeholder="— Sélectionner —" className="w-full" />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Désignation *">
                 <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="input-field" placeholder="Ex: Clé portail principal" />
               </Field>
@@ -270,9 +272,8 @@ function KeysPanel() {
               </Field>
             </div>
             <Field label="Type">
-              <select value={form.keyType} onChange={e => setForm(f => ({ ...f, keyType: e.target.value }))} className="input-field">
-                {KEY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
+              <Select value={form.keyType} onChange={v => setForm(f => ({ ...f, keyType: v }))}
+                options={KEY_TYPES.map(t => ({ value: t.value, label: t.label }))} className="w-full" />
             </Field>
             <Field label="Notes">
               <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} className="input-field resize-none" />
@@ -338,7 +339,7 @@ function EquipmentPanel() {
             const st = EQUIPMENT_STATES.find(s => s.value === eq.state)
             const cat = EQUIPMENT_CATEGORIES.find(c => c.value === eq.category)
             return (
-              <div key={eq.id} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between gap-4">
+              <div key={eq.id} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between gap-4 hover:shadow-md transition-all">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="text-xs font-mono text-slate-400">{eq.code}</span>
@@ -369,17 +370,15 @@ function EquipmentPanel() {
             <Field label="Désignation *">
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="input-field" placeholder="Ex: Radio Motorola DP4400" />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Catégorie">
-                <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="input-field">
-                  {EQUIPMENT_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
+                <Select value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))}
+                  options={EQUIPMENT_CATEGORIES.map(c => ({ value: c.value, label: c.label }))} className="w-full" />
               </Field>
               <Field label="Site">
-                <select value={form.siteId} onChange={e => setForm(f => ({ ...f, siteId: e.target.value }))} className="input-field">
-                  <option value="">— Aucun —</option>
-                  {sites.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+                <Select value={form.siteId} onChange={v => setForm(f => ({ ...f, siteId: v }))}
+                  options={sites.map((s: any) => ({ value: s.id, label: s.name }))}
+                  placeholder="— Aucun —" className="w-full" />
               </Field>
             </div>
             <Field label="Notes">

@@ -36,3 +36,19 @@ export const generateBillingRun = (id: string) =>
 
 export const cancelBillingRun = (id: string) =>
   api.post(`/billing-runs/${id}/cancel`).then(r => r.data)
+
+// Plan comptable (Chart of Accounts)
+export const getAccounts = () =>
+  api.get('/accounting/accounts').then(r => r.data)
+
+export const createAccount = (data: { code: string; label: string }) =>
+  api.post('/accounting/accounts', data).then(r => r.data)
+
+export const updateAccount = (id: string, data: { code?: string; label?: string }) =>
+  api.patch(`/accounting/accounts/${id}`, data).then(r => r.data)
+
+export const deleteAccount = (id: string) =>
+  api.delete(`/accounting/accounts/${id}`).then(r => r.data)
+
+export const resetAccounts = () =>
+  api.post('/accounting/accounts/reset').then(r => r.data)

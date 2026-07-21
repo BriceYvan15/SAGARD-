@@ -30,11 +30,11 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'clients',                 // Voir les clients
     'alertes-commerciales',    // Tableau de bord alertes
   ],
-  RH: ['dashboard', 'rh', 'agents', 'utilisateurs', 'audit'],
-  CHEF_OPERATIONS: ['dashboard', 'operations', 'sites', 'agents', 'supervision', 'registres', 'accueil', 'audit'],
-  CONTROLEUR: ['dashboard', 'operations', 'supervision'],
+  RH: ['rh', 'agents', 'utilisateurs', 'audit'],
+  CHEF_OPERATIONS: ['operations', 'sites', 'agents', 'supervision', 'registres', 'accueil', 'audit'],
+  CONTROLEUR: ['operations', 'supervision'],
   TECHNICIENNE_SURFACE: [],
-  AGENT_ACCUEIL: ['accueil'],
+  AGENT_ACCUEIL: ['accueil', 'stock'],
   AGENT_TERRAIN: [],
   CLIENT: [],
 }
