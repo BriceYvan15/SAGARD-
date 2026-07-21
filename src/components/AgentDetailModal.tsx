@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { X, Loader2, User, Briefcase, Phone, Mail, MapPin, Shield, Calendar, Clock, CreditCard, Heart, Package, GraduationCap, Pencil, Trash2, Save } from 'lucide-react'
-import { getAgent, updateAgent, deleteAgent } from '../services/agents.service'
+import { X, Loader2, User, Briefcase, Phone, Mail, MapPin, Shield, Calendar, Clock, CreditCard, Heart, Package, GraduationCap, Pencil, Trash2, Save, AlertTriangle, ArrowRightLeft, UserX } from 'lucide-react'
+import { getAgent, updateAgent, deleteAgent, terminateAgent } from '../services/agents.service'
 import { fmtDate } from '../lib/utils'
 import AuditHistory from './AuditHistory'
 import Select from './Select'
@@ -19,6 +19,7 @@ const STATUS_CFG: Record<string, { label: string; cls: string }> = {
   EN_FORMATION: { label: 'Formation',      cls: 'bg-amber-100 text-amber-700' },
   INACTIF:      { label: 'Inactif',        cls: 'bg-slate-100 text-slate-500' },
   RECRUTE:      { label: 'Recrute',        cls: 'bg-purple-100 text-purple-700' },
+  RENVOYE:      { label: 'Renvoyé',        cls: 'bg-red-100 text-red-700' },
 }
 
 const SHIFT_LABELS: Record<string, string> = { JOUR: 'Jour', NUIT: 'Nuit', MIXTE: 'Mixte' }
@@ -39,10 +40,13 @@ const COLORS = ['bg-blue-500','bg-purple-500','bg-emerald-500','bg-rose-500','bg
 export default function AgentDetailModal({ agentId, onClose, onRefresh }: Props) {
   const [agent, setAgent] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'info' | 'travail' | 'historique' | 'audit'>('info')
+  const [tab, setTab] = useState<'info' | 'travail' | 'historique' | 'discipline' | 'audit'>('info')
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<any>({})
   const [saving, setSaving] = useState(false)
+  const [showTerminate, setShowTerminate] = useState(false)
+  const [terminateReason, setTerminateReason] = useState('')
+  const [terminating, setTerminating] = useState(false)
 
   useEffect(() => {
     setLoading(true)
@@ -129,8 +133,26 @@ export default function AgentDetailModal({ agentId, onClose, onRefresh }: Props)
     { key: 'info' as const, label: 'Informations' },
     { key: 'travail' as const, label: 'Travail' },
     { key: 'historique' as const, label: 'Historique' },
+    { key: 'discipline' as const, label: 'Discipline & Mutations' },
     { key: 'audit' as const, label: 'Modifications' },
   ]
+
+  const handleTerminate = async () => {
+    if (!terminateReason.trim()) return
+    setTerminating(true)
+    try {
+      await terminateAgent(agentId, terminateReason)
+      const updated = await getAgent(agentId)
+      setAgent(updated)
+      setShowTerminate(false)
+      setTerminateReason('')
+      onRefresh?.()
+    } catch (err: any) {
+      alert(err.response?.data?.message ?? 'Erreur lors du renvoi')
+    } finally {
+      setTerminating(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -157,7 +179,12 @@ export default function AgentDetailModal({ agentId, onClose, onRefresh }: Props)
                   <button onClick={startEdit} className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition-colors">
                     <Pencil size={12} /> Modifier
                   </button>
-                  <button onClick={handleDelete} className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 transition-colors">
+                  {agent.status !== 'RENVOYE' && (
+                    <button onClick={() => setShowTerminate(true)} className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 transition-colors">
+                      <UserX size={12} /> Renvoyer
+                    </button>
+                  )}
+                  <button onClick={handleDelete} className="flex items-center gap-1 px-3 py-1.5 bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold hover:bg-slate-100 transition-colors">
                     <Trash2 size={12} /> Supprimer
                   </button>
                 </>
@@ -325,6 +352,103 @@ export default function AgentDetailModal({ agentId, onClose, onRefresh }: Props)
             </div>
           )}
 
+          {tab === 'discipline' && (
+            <div className="space-y-6">
+              {/* Contract status / termination info */}
+              <section>
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <Shield size={14} /> Statut du contrat
+                </h3>
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-500">Type de contrat</span>
+                    <span className="text-sm font-medium text-slate-800">{CONTRACT_LABELS[agent.contractType] ?? agent.contractType ?? 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-500">Date d'embauche</span>
+                    <span className="text-sm font-medium text-slate-800">{agent.hireDate ? fmtDate(agent.hireDate) : 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-500">Fin de contrat</span>
+                    <span className={`text-sm font-medium ${agent.contractEndDate && new Date(agent.contractEndDate) < new Date() ? 'text-red-600' : 'text-slate-800'}`}>
+                      {agent.contractEndDate ? fmtDate(agent.contractEndDate) : 'N/A'}
+                      {agent.contractEndDate && new Date(agent.contractEndDate) < new Date() && <span className="ml-2 text-xs text-red-500 font-semibold">Expiré</span>}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-500">Statut</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${st.cls}`}>{st.label}</span>
+                  </div>
+                  {agent.status === 'RENVOYE' && (
+                    <div className="pt-3 mt-3 border-t border-slate-200 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle size={14} className="text-red-500 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-semibold text-red-700">Agent renvoyé</p>
+                          <p className="text-xs text-slate-500 mt-1">Motif: <span className="font-medium text-slate-700">{agent.terminationReason}</span></p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {agent.terminatedAt ? `Le ${fmtDate(agent.terminatedAt)}` : ''}
+                            {agent.terminatedBy ? ` par ${agent.terminatedBy.firstName} ${agent.terminatedBy.lastName}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Disciplinary records */}
+              <section>
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <AlertTriangle size={14} /> Fautes & Sanctions ({agent.disciplinary?.length ?? 0})
+                </h3>
+                {agent.disciplinary?.length > 0 ? (
+                  <div className="space-y-2">
+                    {agent.disciplinary.map((d: any) => (
+                      <div key={d.id} className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">Faute n°{d.faultNumber}</span>
+                          <span className="text-xs text-slate-400">{fmtDate(d.date)}</span>
+                        </div>
+                        <p className="text-sm text-slate-700 mt-1.5">{d.description}</p>
+                        {d.sanction && <p className="text-xs text-red-600 mt-1 font-medium">Sanction: {d.sanction}</p>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400 italic">Aucune faute enregistrée</p>
+                )}
+              </section>
+
+              {/* Transfer / mutation history */}
+              <section>
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <ArrowRightLeft size={14} /> Historique des mutations ({agent.transfers?.length ?? 0})
+                </h3>
+                {agent.transfers?.length > 0 ? (
+                  <div className="space-y-2">
+                    {agent.transfers.map((t: any) => (
+                      <div key={t.id} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="font-medium text-slate-700">{t.fromSite?.name ?? 'N/A'}</span>
+                          <ArrowRightLeft size={12} className="text-slate-400" />
+                          <span className="font-medium text-slate-700">{t.toSite?.name ?? 'N/A'}</span>
+                        </div>
+                        <div className="flex items-center justify-between mt-1.5">
+                          <span className="text-xs text-slate-400">{fmtDate(t.transferDate)}</span>
+                          {t.decidedBy && <span className="text-xs text-slate-400">par {t.decidedBy.firstName} {t.decidedBy.lastName}</span>}
+                        </div>
+                        {t.motif && <p className="text-xs text-slate-500 mt-1">Motif: {t.motif}</p>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400 italic">Aucune mutation enregistrée</p>
+                )}
+              </section>
+            </div>
+          )}
+
           {tab === 'historique' && (
             <div className="space-y-6">
               {/* Derniers pointages */}
@@ -410,6 +534,40 @@ export default function AgentDetailModal({ agentId, onClose, onRefresh }: Props)
           )}
         </div>
       </div>
+
+      {/* Termination modal */}
+      {showTerminate && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget) setShowTerminate(false) }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onMouseDown={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h2 className="text-lg font-bold text-red-700 flex items-center gap-2">
+                <UserX size={18} /> Mettre fin au contrat
+              </h2>
+              <button onClick={() => setShowTerminate(false)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} className="text-slate-500" /></button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                <p className="font-semibold mb-1">Vous êtes sur le point de renvoyer :</p>
+                <p className="font-bold">{u.firstName} {u.lastName} — {agent.matricule}</p>
+                <p className="text-xs mt-2">Cette action mettra fin à toutes ses affectations actuelles et marquera son statut comme "Renvoyé".</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Motif du renvoi *</label>
+                <textarea value={terminateReason} onChange={e => setTerminateReason(e.target.value)}
+                  rows={3} placeholder="Ex: Fautes disciplinaires répétées, fin de contrat, abandon de poste..."
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-red-400/40 focus:border-red-400 outline-none transition-colors" />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setShowTerminate(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-sm">Annuler</button>
+                <button onClick={handleTerminate} disabled={terminating || !terminateReason.trim()}
+                  className="flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 disabled:opacity-60">
+                  {terminating ? <Loader2 size={14} className="animate-spin" /> : <UserX size={14} />} Confirmer le renvoi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
