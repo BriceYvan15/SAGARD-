@@ -5,6 +5,7 @@ import {
   FileText, Briefcase, AlertTriangle, User, Hash,
   CheckCircle, Printer, MapPinned, Calendar, Users, Ban,
 } from 'lucide-react'
+import { PAYMENT_METHOD_LABELS } from '../lib/payment-methods'
 import { useApi } from '../lib/useApi'
 import { getClient, getClientStats, downloadClientPdf } from '../services/clients.service'
 import { fmt, fmtDate } from '../lib/utils'
@@ -23,13 +24,6 @@ const STATUS_INVOICE: Record<string, { label: string; cls: string }> = {
   PAYEE:     { label: 'Payée',      cls: 'bg-green-100 text-green-700' },
   RETARD:    { label: 'En retard',  cls: 'bg-red-100 text-red-700' },
   ANNULEE:   { label: 'Annulée',    cls: 'bg-slate-100 text-slate-400' },
-}
-
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  CHEQUE:            'Chèque',
-  VIREMENT_BANCAIRE: 'Virement bancaire',
-  MOBILE_MONEY:      'Mobile Money',
-  ESPECE:            'Espèces',
 }
 
 const SEGMENT_LABELS: Record<string, string> = {
