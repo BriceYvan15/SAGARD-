@@ -1,6 +1,7 @@
 import { Fragment, useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Receipt, Search, Eye, AlertCircle, CheckCircle, Clock, FileText, Loader2, Plus, X, Trash2, Layers, ChevronRight, ArrowLeft, PlayCircle, MoreVertical, Pencil, Send, Download, AlertTriangle, CreditCard } from 'lucide-react'
+import { PAYMENT_METHODS } from '../lib/payment-methods'
 import Pagination from '../components/Pagination'
 import DatePicker from '../components/DatePicker'
 import Select from '../components/Select'
@@ -20,12 +21,7 @@ const FREQUENCIES = [
   { value: 'ANNUELLE',      label: 'Annuelle' },
 ]
 
-const PAYMENT_METHODS = [
-  { value: 'CHEQUE',             label: 'Chèque' },
-  { value: 'VIREMENT_BANCAIRE',  label: 'Virement bancaire' },
-  { value: 'MOBILE_MONEY',       label: 'Mobile Money' },
-  { value: 'ESPECE',             label: 'Espèces' },
-]
+// PAYMENT_METHODS imported from lib/payment-methods
 
 const STATUS_CFG: Record<string, { label: string; cls: string }> = {
   BROUILLON: { label: 'Brouillon', cls: 'bg-slate-100 text-slate-600' },

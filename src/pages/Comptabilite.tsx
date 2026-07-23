@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { TrendingUp, TrendingDown, DollarSign, BookOpen, Wallet, Loader2, ArrowUpRight, ArrowDownRight, Filter, CreditCard, Plus, X, Receipt, FileText, Play, Ban } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, BookOpen, Wallet, Loader2, ArrowUpRight, ArrowDownRight, Filter, CreditCard, Plus, X, Receipt, FileText, Play, Ban, ArrowRightLeft, Landmark, PiggyBank } from 'lucide-react'
+import { PAYMENT_METHODS } from '../lib/payment-methods'
 import { getAccountingDashboard, getJournal, getTreasury, getUnpaidInvoices, registerPayment, recordExpense, getExpenses, getBillingRuns, createBillingRun, generateBillingRun, cancelBillingRun, getAccounts } from '../services/accounting.service'
+import { getTreasuryAccounts, getTreasuryAccount, seedTreasuryAccounts, debitTreasuryAccount, creditTreasuryAccount, transferTreasury } from '../services/treasury.service'
 import { fmt, fmtDate } from '../lib/utils'
 import Select from '../components/Select'
 import DatePicker from '../components/DatePicker'
 
-type Tab = 'dashboard' | 'journal' | 'treasury' | 'payments' | 'expenses' | 'billing'
+type Tab = 'dashboard' | 'journal' | 'treasury' | 'accounts' | 'payments' | 'expenses' | 'billing'
 
 const ENTRY_TYPES = [
   { value: '', label: 'Tous' },
@@ -27,12 +29,7 @@ const TYPE_COLORS: Record<string, string> = {
   DEPENSE: 'bg-rose-100 text-rose-700',
 }
 
-const PAYMENT_METHODS = [
-  { value: 'VIREMENT', label: 'Virement bancaire' },
-  { value: 'CHEQUE', label: 'Chèque' },
-  { value: 'ESPECES', label: 'Espèces' },
-  { value: 'MOBILE_MONEY', label: 'Mobile Money' },
-]
+// PAYMENT_METHODS imported from lib/payment-methods
 
 const DEFAULT_ACCOUNTS = [
   { code: '411', label: 'Clients' },
@@ -64,7 +61,7 @@ export default function Comptabilite() {
   const [unpaid, setUnpaid] = useState<any[]>([])
   const [pLoad, setPLoad] = useState(false)
   const [payModal, setPayModal] = useState<any>(null)
-  const [payForm, setPayForm] = useState({ amount: '', paymentDate: new Date().toISOString().slice(0, 10), paymentMethod: 'VIREMENT', reference: '' })
+  const [payForm, setPayForm] = useState({ amount: '', paymentDate: new Date().toISOString().slice(0, 10), paymentMethod: 'ESPECE', reference: '' })
   const [payingSaving, setPayingSaving] = useState(false)
 
   // Expenses
@@ -81,6 +78,17 @@ export default function Comptabilite() {
   const [showBillingForm, setShowBillingForm] = useState(false)
   const [billingForm, setBillingForm] = useState({ period: new Date().toISOString().slice(0, 7), invoiceDate: new Date().toISOString().slice(0, 10), invoicingFrequency: 'monthly' })
   const [billingSaving, setBillingSaving] = useState(false)
+
+  // Treasury Accounts
+  const [trAccounts, setTrAccounts] = useState<any[]>([])
+  const [trLoad, setTrLoad] = useState(false)
+  const [selectedAccount, setSelectedAccount] = useState<any>(null)
+  const [showTransfer, setShowTransfer] = useState(false)
+  const [transferForm, setTransferForm] = useState({ fromId: '', toId: '', amount: '', description: '' })
+  const [transferSaving, setTransferSaving] = useState(false)
+  const [showDebitCredit, setShowDebitCredit] = useState<any>(null)
+  const [dcForm, setDcForm] = useState({ amount: '', description: '', reference: '' })
+  const [dcSaving, setDcSaving] = useState(false)
 
   useEffect(() => {
     setDashLoading(true)
@@ -100,6 +108,56 @@ export default function Comptabilite() {
       getTreasury(year).then(setTreasury).catch(() => {}).finally(() => setTLoad(false))
     }
   }, [tab, year])
+
+  useEffect(() => {
+    if (tab === 'accounts') {
+      setTrLoad(true)
+      getTreasuryAccounts().then(setTrAccounts).catch(() => {}).finally(() => setTrLoad(false))
+    }
+  }, [tab])
+
+  const reloadAccounts = () => {
+    setTrLoad(true)
+    getTreasuryAccounts().then(setTrAccounts).catch(() => {}).finally(() => setTrLoad(false))
+  }
+
+  const handleSeedAccounts = async () => {
+    try {
+      await seedTreasuryAccounts()
+      reloadAccounts()
+    } catch (e: any) { alert(e.response?.data?.message ?? 'Erreur') }
+  }
+
+  const handleTransfer = async () => {
+    if (!transferForm.fromId || !transferForm.toId || !transferForm.amount) return
+    setTransferSaving(true)
+    try {
+      await transferTreasury({ fromId: transferForm.fromId, toId: transferForm.toId, amount: +transferForm.amount, description: transferForm.description })
+      setShowTransfer(false)
+      setTransferForm({ fromId: '', toId: '', amount: '', description: '' })
+      reloadAccounts()
+    } catch (e: any) { alert(e.response?.data?.message ?? 'Erreur') } finally { setTransferSaving(false) }
+  }
+
+  const handleDebitCredit = async (type: 'debit' | 'credit') => {
+    if (!showDebitCredit || !dcForm.amount) return
+    setDcSaving(true)
+    try {
+      if (type === 'debit') {
+        await debitTreasuryAccount(showDebitCredit.id, { amount: +dcForm.amount, description: dcForm.description, reference: dcForm.reference })
+      } else {
+        await creditTreasuryAccount(showDebitCredit.id, { amount: +dcForm.amount, description: dcForm.description, reference: dcForm.reference })
+      }
+      setShowDebitCredit(null)
+      setDcForm({ amount: '', description: '', reference: '' })
+      reloadAccounts()
+    } catch (e: any) { alert(e.response?.data?.message ?? 'Erreur') } finally { setDcSaving(false) }
+  }
+
+  const viewAccountDetail = async (id: string) => {
+    const acct = await getTreasuryAccount(id)
+    setSelectedAccount(acct)
+  }
 
   useEffect(() => {
     if (tab === 'payments') {
@@ -207,6 +265,7 @@ export default function Comptabilite() {
           { key: 'expenses' as Tab, label: 'Dépenses', icon: Receipt },
           { key: 'journal' as Tab, label: 'Journal', icon: BookOpen },
           { key: 'treasury' as Tab, label: 'Trésorerie', icon: Wallet },
+          { key: 'accounts' as Tab, label: 'Comptes', icon: Landmark },
           { key: 'billing' as Tab, label: 'Facturation auto', icon: FileText },
         ]).map(t => {
           const Icon = t.icon
@@ -433,7 +492,7 @@ export default function Comptabilite() {
                           </td>
                           <td className="px-4 py-3">
                             <button onClick={() => {
-                              setPayForm({ amount: String(invRemaining), paymentDate: new Date().toISOString().slice(0, 10), paymentMethod: 'VIREMENT', reference: '' })
+                              setPayForm({ amount: String(invRemaining), paymentDate: new Date().toISOString().slice(0, 10), paymentMethod: 'ESPECE', reference: '' })
                               setPayModal(inv)
                             }}
                               className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-semibold hover:bg-green-100 transition-colors">
@@ -658,6 +717,222 @@ export default function Comptabilite() {
             </div>
           </div>
         )
+      )}
+
+      {/* ═══ COMPTES DE TRÉSORERIE ═══ */}
+      {tab === 'accounts' && (
+        trLoad ? <div className="flex justify-center py-20"><Loader2 className="animate-spin text-slate-300" size={28} /></div> : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-slate-800">Comptes de trésorerie</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Chaque paiement crédite automatiquement le compte correspondant</p>
+              </div>
+              <div className="flex gap-2">
+                {trAccounts.length === 0 && (
+                  <button onClick={handleSeedAccounts}
+                    className="flex items-center gap-2 px-4 py-2 bg-sagard-yellow text-slate-900 rounded-lg text-sm font-bold hover:bg-sagard-yellow/90 transition-colors">
+                    <PiggyBank size={15} /> Initialiser les comptes
+                  </button>
+                )}
+                <button onClick={() => setShowTransfer(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+                  <ArrowRightLeft size={15} /> Transfert
+                </button>
+              </div>
+            </div>
+
+            {/* Account cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {trAccounts.map((a: any) => {
+                const typeIcon = a.type === 'BANQUE' ? Landmark : a.type === 'MOBILE_MONEY' ? Wallet : PiggyBank
+                const Icon = typeIcon
+                const typeColor = a.type === 'BANQUE' ? 'text-blue-600 bg-blue-50' : a.type === 'MOBILE_MONEY' ? 'text-orange-600 bg-orange-50' : 'text-green-600 bg-green-50'
+                return (
+                  <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${typeColor}`}>
+                          <Icon size={20} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-800 text-sm">{a.name}</p>
+                          <p className="text-xs text-slate-400">{a.bankName ?? a.type}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mb-3">
+                      <p className="text-2xl font-black text-slate-800">{fmt(Number(a.balance))}</p>
+                      <p className="text-xs text-slate-400">{a.currency}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {(a.paymentMethods ?? []).map((m: string) => (
+                        <span key={m} className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full font-medium">
+                          {PAYMENT_METHODS.find(p => p.value === m)?.label ?? m}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => viewAccountDetail(a.id)}
+                        className="flex-1 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+                        Détails
+                      </button>
+                      <button onClick={() => { setShowDebitCredit(a); setDcForm({ amount: '', description: '', reference: '' }) }}
+                        className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
+                        Débit
+                      </button>
+                      <button onClick={() => { setShowDebitCredit(a); setDcForm({ amount: '', description: '', reference: '' }) }}
+                        className="px-3 py-1.5 text-xs font-medium text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
+                        Crédit
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Total balance */}
+            {trAccounts.length > 0 && (
+              <div className="bg-slate-800 rounded-xl p-5 text-white">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-300">Solde total de trésorerie</span>
+                  <span className="text-2xl font-black">{fmt(trAccounts.reduce((s: number, a: any) => s + Number(a.balance), 0))}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      )}
+
+      {/* Account detail modal */}
+      {selectedAccount && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setSelectedAccount(null)}>
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div>
+                <h3 className="font-bold text-slate-800">{selectedAccount.name}</h3>
+                <p className="text-xs text-slate-400">{selectedAccount.bankName ?? selectedAccount.type} · Solde: {fmt(Number(selectedAccount.balance))}</p>
+              </div>
+              <button onClick={() => setSelectedAccount(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            </div>
+            <div className="overflow-y-auto px-6 py-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase mb-3">Transactions récentes</p>
+              <div className="space-y-2">
+                {(selectedAccount.transactions ?? []).map((t: any) => (
+                  <div key={t.id} className="flex items-center justify-between py-2 border-b border-slate-50">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${t.type === 'CREDIT' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                        {t.type === 'CREDIT' ? <ArrowDownRight size={16} /> : <ArrowUpRight size={16} />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">{t.description ?? (t.type === 'CREDIT' ? 'Crédit' : 'Débit')}</p>
+                        <p className="text-xs text-slate-400">{fmtDate(t.createdAt)}{t.reference ? ` · ${t.reference}` : ''}</p>
+                        {t.payment?.invoice && (
+                          <p className="text-xs text-slate-400">
+                            {t.payment.invoice.reference} · {t.payment.invoice.client?.name ?? t.payment.invoice.lead?.companyName ?? t.payment.invoice.lead?.contactName ?? ''}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <span className={`font-bold text-sm ${t.type === 'CREDIT' ? 'text-green-600' : 'text-red-600'}`}>
+                      {t.type === 'CREDIT' ? '+' : '-'}{fmt(Number(t.amount))}
+                    </span>
+                  </div>
+                ))}
+                {(selectedAccount.transactions ?? []).length === 0 && (
+                  <p className="text-center text-sm text-slate-400 py-8">Aucune transaction</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer modal */}
+      {showTransfer && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowTransfer(false)}>
+          <div className="bg-white rounded-2xl max-w-md w-full" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h3 className="font-bold text-slate-800">Transfert entre comptes</h3>
+              <button onClick={() => setShowTransfer(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Compte source</label>
+                <select value={transferForm.fromId} onChange={e => setTransferForm(f => ({ ...f, fromId: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg">
+                  <option value="">— Sélectionner —</option>
+                  {trAccounts.map((a: any) => <option key={a.id} value={a.id}>{a.name} ({fmt(Number(a.balance))})</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Compte destination</label>
+                <select value={transferForm.toId} onChange={e => setTransferForm(f => ({ ...f, toId: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg">
+                  <option value="">— Sélectionner —</option>
+                  {trAccounts.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Montant</label>
+                <input type="number" value={transferForm.amount} onChange={e => setTransferForm(f => ({ ...f, amount: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Description (optionnel)</label>
+                <input value={transferForm.description} onChange={e => setTransferForm(f => ({ ...f, description: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg" placeholder="Motif du transfert" />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowTransfer(false)} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Annuler</button>
+                <button onClick={handleTransfer} disabled={transferSaving || !transferForm.fromId || !transferForm.toId || !transferForm.amount}
+                  className="flex-1 px-4 py-2.5 bg-sagard-yellow text-slate-900 rounded-lg text-sm font-bold hover:bg-sagard-yellow/90 disabled:opacity-50">
+                  {transferSaving ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'Transférer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Debit/Credit modal */}
+      {showDebitCredit && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowDebitCredit(null)}>
+          <div className="bg-white rounded-2xl max-w-md w-full" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h3 className="font-bold text-slate-800">Mouvement — {showDebitCredit.name}</h3>
+              <button onClick={() => setShowDebitCredit(null)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Montant</label>
+                <input type="number" value={dcForm.amount} onChange={e => setDcForm(f => ({ ...f, amount: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg" placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Description</label>
+                <input value={dcForm.description} onChange={e => setDcForm(f => ({ ...f, description: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg" placeholder="Motif" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Référence (optionnel)</label>
+                <input value={dcForm.reference} onChange={e => setDcForm(f => ({ ...f, reference: e.target.value }))}
+                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg" placeholder="N° chèque, réf..." />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowDebitCredit(null)} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Annuler</button>
+                <button onClick={() => handleDebitCredit('debit')} disabled={dcSaving || !dcForm.amount}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 disabled:opacity-50">
+                  {dcSaving ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'Débiter'}
+                </button>
+                <button onClick={() => handleDebitCredit('credit')} disabled={dcSaving || !dcForm.amount}
+                  className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 disabled:opacity-50">
+                  {dcSaving ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'Créditer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ═══ FACTURATION AUTOMATIQUE ═══ */}

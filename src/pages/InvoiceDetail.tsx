@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { ArrowLeft, Printer, Loader2, Mail, Phone, Globe, Send, Download, Paperclip, X, CreditCard, CheckCircle } from 'lucide-react'
+import { PAYMENT_METHOD_LABELS } from '../lib/payment-methods'
 import { fmt, fmtDate, daysOverdue } from '../lib/utils'
 import { useApi } from '../lib/useApi'
 import { getInvoice, sendInvoiceEmail, downloadInvoicePdf, sendInvoiceEmailWithAttachment, updateInvoiceStatus } from '../services/invoices.service'
@@ -121,12 +122,6 @@ export default function InvoiceDetail() {
   const paymentLink = `https://pay.djamo.com/3waob`
   const qrData      = paymentLink
 
-  const PAYMENT_METHOD_LABELS: Record<string, string> = {
-    CHEQUE:            'Chèque',
-    VIREMENT_BANCAIRE: 'Virement bancaire',
-    MOBILE_MONEY:      'Mobile Money',
-    ESPECE:            'Espèces',
-  }
   const paymentMethodLabel = i.paymentMethod ? (PAYMENT_METHOD_LABELS[i.paymentMethod] ?? i.paymentMethod) : '—'
 
   const docType = i.type === 'DEVIS' ? 'Devis' : i.type === 'PROFORMA' ? 'Facture Proforma' : 'Facture'
@@ -517,9 +512,16 @@ export default function InvoiceDetail() {
                 <label className="block text-xs font-medium text-slate-600 mb-1">Mode de paiement</label>
                 <select value={payForm.paymentMethod} onChange={e => setPayForm(f => ({ ...f, paymentMethod: e.target.value }))}
                   className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg">
-                  <option value="VIREMENT_BANCAIRE">Virement bancaire</option>
-                  <option value="CHEQUE">Chèque</option>
-                  <option value="MOBILE_MONEY">Mobile Money</option>
+                  <option value="">— Sélectionner —</option>
+                  <option value="CHEQUE_NSIA">Chèque NSIA</option>
+                  <option value="VIREMENT_NSIA">Virement NSIA</option>
+                  <option value="CHEQUE_BOA">Chèque BOA</option>
+                  <option value="VIREMENT_BOA">Virement BOA</option>
+                  <option value="CHEQUE_ECOBANK">Chèque Ecobank</option>
+                  <option value="VIREMENT_ECOBANK">Virement Ecobank</option>
+                  <option value="WAVE">Wave</option>
+                  <option value="ORANGE_MONEY">Orange Money</option>
+                  <option value="DJAMO">Djamo</option>
                   <option value="ESPECE">Espèces</option>
                 </select>
               </div>
