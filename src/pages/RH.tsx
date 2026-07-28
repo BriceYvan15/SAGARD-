@@ -2,7 +2,8 @@ import { Fragment, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Users, DollarSign, Calendar, AlertTriangle, CheckCircle, Clock, Loader2, Plus, X, Award, UserPlus, FileText, Eye, Briefcase, Ban, Pencil, ShieldOff, ShieldCheck, Search, Trash2 } from 'lucide-react'
 import { useApi } from '../lib/useApi'
-import { getPayrolls, generatePayroll, approvePayroll, markPayrollPaid, deletePayroll, getPayslip, getPayrollDetail, updatePayrollLine, toggleBlockPayrollLine, getLeaves, createLeave, approveLeave, rejectLeave, getTrainings, createTraining, getCandidacies, createCandidacy, updateIntegrationStep, getContractExpiryAlerts, getIndisciplinedAgents, getDisciplinary, createDisciplinary, getContracts } from '../services/hr.service'
+import { getPayrolls, createPayrollMonth, validatePayrollLine, payPayrollLine, deletePayroll, getPayslip, getPayrollDetail, updatePayrollLine, toggleBlockPayrollLine, getLeaves, createLeave, approveLeave, rejectLeave, getTrainings, createTraining, getCandidacies, createCandidacy, updateIntegrationStep, getContractExpiryAlerts, getIndisciplinedAgents, getDisciplinary, createDisciplinary, getContracts } from '../services/hr.service'
+import { getTreasuryAccounts } from '../services/treasury.service'
 import { getAgents } from '../services/agents.service'
 import { fmt, fmtDate } from '../lib/utils'
 import NewPostulantModal from '../components/NewPostulantModal'
@@ -10,10 +11,11 @@ import ConvertToAgentModal from '../components/ConvertToAgentModal'
 import Select from '../components/Select'
 import DatePicker from '../components/DatePicker'
 
-const STATUS_PAYROLL: Record<string, { label: string; cls: string }> = {
+const STATUS_LINE: Record<string, { label: string; cls: string }> = {
   BROUILLON: { label: 'Brouillon',  cls: 'bg-slate-100 text-slate-600' },
   VALIDE:    { label: 'Validé',     cls: 'bg-blue-100 text-blue-700' },
   PAYE:      { label: 'Payé',       cls: 'bg-green-100 text-green-700' },
+  BLOQUE:    { label: 'Bloqué',    cls: 'bg-red-100 text-red-700' },
 }
 const STATUS_LEAVE: Record<string, { label: string; cls: string }> = {
   EN_ATTENTE: { label: 'En attente', cls: 'bg-amber-100 text-amber-700' },
@@ -86,10 +88,16 @@ export default function RH() {
   // Delete payroll modal
   const [deletePayrollItem, setDeletePayrollItem] = useState<any | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
-  // Generate payroll modal
-  const [showGenModal, setShowGenModal] = useState(false)
-  const [selectedAgentIds, setSelectedAgentIds] = useState<Set<string>>(new Set())
-  const [genSearch, setGenSearch] = useState('')
+  // Create month modal
+  const [showCreateMonthModal, setShowCreateMonthModal] = useState(false)
+  const [createMonthForm, setCreateMonthForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear() })
+  // Pay line modal
+  const [payLineData, setPayLineData] = useState<any | null>(null)
+  const [payForm, setPayForm] = useState({ treasuryAccountId: '', paymentMethod: 'VIREMENT_BANCAIRE', reference: '' })
+  const [paySaving, setPaySaving] = useState(false)
+  // Treasury accounts for payment modal
+  const { data: treasuryAccountsData } = useApi(getTreasuryAccounts)
+  const treasuryAccounts = (treasuryAccountsData as any[]) ?? []
 
   const { data: payrolls, loading: pLoad, reload: reloadP }   = useApi(getPayrolls)
   const { data: leaves,   loading: lLoad, reload: reloadL }   = useApi(getLeaves)
@@ -105,29 +113,46 @@ export default function RH() {
 
   const now = new Date()
 
-  async function handleGenerate() {
-    const activeAgents = agents.filter((a: any) => a.status === 'EN_POSTE')
-    setSelectedAgentIds(new Set(activeAgents.map((a: any) => a.id)))
-    setShowGenModal(true)
-  }
-
-  async function handleGenerateSelected() {
+  async function handleCreateMonth() {
     setGenLoading(true)
     try {
-      const ids = Array.from(selectedAgentIds)
-      await generatePayroll(now.getMonth() + 1, now.getFullYear(), ids.length > 0 ? ids : undefined)
-      setShowGenModal(false)
+      await createPayrollMonth(createMonthForm.month, createMonthForm.year)
+      setShowCreateMonthModal(false)
       reloadP()
     } catch (e: any) {
-      alert(e.response?.data?.message ?? 'Erreur génération')
+      alert(e.response?.data?.message ?? 'Erreur création mois de paie')
     } finally { setGenLoading(false) }
   }
 
-  async function handleApprovePayroll(id: string) {
-    setAction(id)
-    try { await approvePayroll(id); reloadP() }
-    catch (e: any) { alert(e.response?.data?.message ?? 'Erreur') }
+  async function handleValidateLine(lineId: string) {
+    setAction(lineId)
+    try {
+      await validatePayrollLine(lineId)
+      if (expandedPayroll) {
+        const detail = await getPayrollDetail(expandedPayroll)
+        setPayrollDetail(detail)
+      }
+      reloadP()
+    } catch (e: any) { alert(e.response?.data?.message ?? 'Erreur') }
     finally { setAction(null) }
+  }
+
+  async function handlePayLine() {
+    if (!payLineData) return
+    if (!payForm.treasuryAccountId) { alert('Veuillez sélectionner un compte de trésorerie'); return }
+    setPaySaving(true)
+    try {
+      await payPayrollLine(payLineData.id, payForm)
+      if (expandedPayroll) {
+        const detail = await getPayrollDetail(expandedPayroll)
+        setPayrollDetail(detail)
+      }
+      reloadP()
+      setPayLineData(null)
+      setPayForm({ treasuryAccountId: '', paymentMethod: 'VIREMENT_BANCAIRE', reference: '' })
+    } catch (e: any) {
+      alert(e.response?.data?.message ?? 'Erreur paiement')
+    } finally { setPaySaving(false) }
   }
 
   async function handleExpandPayroll(p: any) {
@@ -233,10 +258,9 @@ export default function RH() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-slate-800">Gestion de la paie</h2>
-            <button onClick={handleGenerate} disabled={genLoading}
-              className="flex items-center gap-2 bg-sagard-yellow hover:bg-sagard-yellow-dark text-sagard-dark text-sm font-bold px-4 py-2 rounded-xl transition-colors disabled:opacity-60">
-              {genLoading ? <Loader2 size={16} className="animate-spin" /> : <DollarSign size={16} />}
-              Générer paie {now.toLocaleString('fr-FR', { month: 'long' })} {now.getFullYear()}
+            <button onClick={() => { setCreateMonthForm({ month: now.getMonth() + 1, year: now.getFullYear() }); setShowCreateMonthModal(true) }}
+              className="flex items-center gap-2 bg-sagard-yellow hover:bg-sagard-yellow-dark text-sagard-dark text-sm font-bold px-4 py-2 rounded-xl transition-colors">
+              <Plus size={16} /> Nouveau mois
             </button>
           </div>
 
@@ -245,7 +269,6 @@ export default function RH() {
           ) : (
             <div className="space-y-3">
               {((payrolls as any[]) ?? []).map((p: any) => {
-                const st = STATUS_PAYROLL[p.status] ?? { label: p.status, cls: 'bg-slate-100 text-slate-600' }
                 const isExpanded = expandedPayroll === p.id
                 const lines = payrollDetail?.lines ?? p.lines ?? []
                 const filteredLines = payrollSearch
@@ -255,7 +278,9 @@ export default function RH() {
                       return name.includes(payrollSearch.toLowerCase()) || mat.includes(payrollSearch.toLowerCase())
                     })
                   : lines
-                const blockedCount = lines.filter((l: any) => l.blocked).length
+                const paidCount = p.paidCount ?? lines.filter((l: any) => l.paymentStatus === 'PAYE').length
+                const totalLines = p.totalLines ?? lines.length
+                const blockedCount = p.blockedCount ?? lines.filter((l: any) => l.blocked).length
                 return (
                   <div key={p.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                     <div className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-slate-50" onClick={() => handleExpandPayroll(p)}>
@@ -263,7 +288,10 @@ export default function RH() {
                         <div className="w-10 h-10 bg-sagard-yellow/20 rounded-lg flex items-center justify-center"><DollarSign size={18} className="text-sagard-yellow-dark" /></div>
                         <div>
                           <p className="font-bold text-slate-800">{String(p.month).padStart(2,'0')}/{p.year}</p>
-                          <p className="text-xs text-slate-400">{p.lines?.length ?? 0} agents{blockedCount > 0 && <span className="text-red-500 font-medium"> · {blockedCount} bloqué(s)</span>}</p>
+                          <p className="text-xs text-slate-400">
+                            {totalLines} agents · {paidCount} payé(s)
+                            {blockedCount > 0 && <span className="text-red-500 font-medium"> · {blockedCount} bloqué(s)</span>}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-6">
@@ -275,32 +303,11 @@ export default function RH() {
                           <p className="text-xs text-slate-400">Net</p>
                           <p className="font-bold text-green-700">{fmt(p.totalNet)}</p>
                         </div>
-                        <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${st.cls}`}>{st.label}</span>
                         <div className="flex gap-2">
-                          {p.status === 'BROUILLON' && (
-                            <>
-                              <button onClick={(e) => { e.stopPropagation(); handleApprovePayroll(p.id) }} disabled={actionLoading === p.id}
-                              className="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1">
-                              {actionLoading === p.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />} Valider
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); setDeletePayrollItem(p) }} title="Supprimer"
-                              className="text-xs bg-red-50 text-red-600 hover:bg-red-100 px-2.5 py-1.5 rounded-lg font-medium flex items-center gap-1">
-                              <Trash2 size={12} />
-                            </button>
-                            </>
-                          )}
-                          {p.status === 'VALIDE' && (
-                            <>
-                            <button onClick={async (e) => { e.stopPropagation(); setAction(p.id); try { await markPayrollPaid(p.id); reloadP() } catch {} finally { setAction(null) } }} disabled={actionLoading === p.id}
-                              className="text-xs bg-green-50 text-green-700 hover:bg-green-100 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1">
-                              {actionLoading === p.id ? <Loader2 size={12} className="animate-spin" /> : <DollarSign size={12} />} Marquer payé
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); setDeletePayrollItem(p) }} title="Supprimer"
-                              className="text-xs bg-red-50 text-red-600 hover:bg-red-100 px-2.5 py-1.5 rounded-lg font-medium flex items-center gap-1">
-                              <Trash2 size={12} />
-                            </button>
-                            </>
-                          )}
+                          <button onClick={(e) => { e.stopPropagation(); setDeletePayrollItem(p) }} title="Supprimer"
+                            className="text-xs bg-red-50 text-red-600 hover:bg-red-100 px-2.5 py-1.5 rounded-lg font-medium flex items-center gap-1">
+                            <Trash2 size={12} />
+                          </button>
                         </div>
                         <span className={`transition-transform text-slate-400 ${isExpanded ? 'rotate-180' : ''}`}>▼</span>
                       </div>
@@ -326,12 +333,14 @@ export default function RH() {
                           <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                               <thead className="bg-slate-50"><tr>
-                                {['Agent','Poste','Site','Jours','Salaire base','Primes','Brut','Retenues','Net','Actions'].map(h => (
+                                {['Agent','Poste','Site','Jours','Salaire base','Primes','Brut','Retenues','Net','Statut','Actions'].map(h => (
                                   <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase whitespace-nowrap">{h}</th>
                                 ))}
                               </tr></thead>
                               <tbody className="divide-y divide-slate-50">
-                                {filteredLines.map((l: any) => (
+                                {filteredLines.map((l: any) => {
+                                  const lst = STATUS_LINE[l.paymentStatus] ?? { label: l.paymentStatus, cls: 'bg-slate-100 text-slate-600' }
+                                  return (
                                   <tr key={l.id} className={`hover:bg-slate-50 ${l.blocked ? 'bg-red-50/50' : ''}`}>
                                     <td className="px-3 py-2.5">
                                       <div className="font-medium text-slate-800">{l.agent?.user?.firstName} {l.agent?.user?.lastName}</div>
@@ -355,18 +364,47 @@ export default function RH() {
                                       )}
                                     </td>
                                     <td className="px-3 py-2.5">
+                                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${lst.cls}`}>{lst.label}</span>
+                                    </td>
+                                    <td className="px-3 py-2.5">
                                       <div className="flex items-center gap-1">
-                                        {p.status === 'BROUILLON' && (
+                                        {l.paymentStatus === 'BROUILLON' && (
                                           <>
                                             <button onClick={() => openEditLine(l)} title="Modifier"
                                               className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
                                               <Pencil size={13} />
                                             </button>
-                                            <button onClick={() => { setBlockLine(l); setBlockReason(l.blockReason ?? '') }} title={l.blocked ? 'Débloquer' : 'Bloquer'}
-                                              className={`p-1.5 rounded-lg transition-colors ${l.blocked ? 'hover:bg-green-50 text-green-600' : 'hover:bg-red-50 text-red-500'}`}>
-                                              {l.blocked ? <ShieldCheck size={13} /> : <ShieldOff size={13} />}
+                                            <button onClick={() => { setBlockLine(l); setBlockReason(l.blockReason ?? '') }} title="Bloquer"
+                                              className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors">
+                                              <ShieldOff size={13} />
+                                            </button>
+                                            <button onClick={() => handleValidateLine(l.id)} disabled={actionLoading === l.id} title="Valider"
+                                              className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors">
+                                              {actionLoading === l.id ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={13} />}
                                             </button>
                                           </>
+                                        )}
+                                        {l.paymentStatus === 'VALIDE' && (
+                                          <>
+                                            <button onClick={() => openEditLine(l)} title="Modifier"
+                                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                                              <Pencil size={13} />
+                                            </button>
+                                            <button onClick={() => { setBlockLine(l); setBlockReason(l.blockReason ?? '') }} title="Bloquer"
+                                              className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors">
+                                              <ShieldOff size={13} />
+                                            </button>
+                                            <button onClick={() => { setPayLineData(l); setPayForm({ treasuryAccountId: '', paymentMethod: 'VIREMENT_BANCAIRE', reference: '' }) }} title="Payer"
+                                              className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors">
+                                              <DollarSign size={13} />
+                                            </button>
+                                          </>
+                                        )}
+                                        {l.paymentStatus === 'BLOQUE' && (
+                                          <button onClick={() => { setBlockLine(l); setBlockReason(l.blockReason ?? '') }} title="Débloquer"
+                                            className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors">
+                                            <ShieldCheck size={13} />
+                                          </button>
                                         )}
                                         <button onClick={async () => { setPayslipLoading(true); try { const data = await getPayslip(l.id); setPayslipData(data) } catch { alert('Erreur chargement fiche') } finally { setPayslipLoading(false) } }}
                                           className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors" title="Voir fiche">
@@ -375,9 +413,10 @@ export default function RH() {
                                       </div>
                                     </td>
                                   </tr>
-                                ))}
+                                  )
+                                })}
                                 {filteredLines.length === 0 && (
-                                  <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-400 text-sm">Aucun agent trouvé</td></tr>
+                                  <tr><td colSpan={11} className="px-4 py-8 text-center text-slate-400 text-sm">Aucun agent trouvé</td></tr>
                                 )}
                               </tbody>
                               {filteredLines.length > 0 && (
@@ -389,7 +428,7 @@ export default function RH() {
                                     <td className="px-3 py-3 text-slate-800">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.grossSalary), 0))}</td>
                                     <td className="px-3 py-3 text-red-700">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.deductions), 0))}</td>
                                     <td className="px-3 py-3 text-green-700">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.netSalary), 0))}</td>
-                                    <td></td>
+                                    <td></td><td></td>
                                   </tr>
                                 </tfoot>
                               )}
@@ -403,7 +442,7 @@ export default function RH() {
               })}
               {((payrolls as any[]) ?? []).length === 0 && (
                 <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-400 text-sm">
-                  <DollarSign size={40} className="mx-auto mb-3 opacity-30" /> Aucune fiche de paie générée
+                  <DollarSign size={40} className="mx-auto mb-3 opacity-30" /> Aucune fiche de paie. Cliquez sur « Nouveau mois » pour commencer.
                 </div>
               )}
             </div>
@@ -1131,89 +1170,101 @@ export default function RH() {
       </div>
     )}
 
-    {/* ═══ Modal Générer paie avec sélection d'agents ═══ */}
-    {showGenModal && (
+    {/* ═══ Modal Nouveau mois de paie ═══ */}
+    {showCreateMonthModal && (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <DollarSign size={18} className="text-sagard-yellow-dark" /> Générer la paie — {now.toLocaleString('fr-FR', { month: 'long' })} {now.getFullYear()}
+              <Plus size={18} className="text-sagard-yellow-dark" /> Nouveau mois de paie
             </h2>
-            <button onClick={() => setShowGenModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} className="text-slate-500" /></button>
+            <button onClick={() => setShowCreateMonthModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} className="text-slate-500" /></button>
           </div>
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-            <div className="relative flex-1">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                value={genSearch}
-                onChange={e => setGenSearch(e.target.value)}
-                placeholder="Rechercher un agent..."
-                className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/30"
-              />
+          <div className="px-6 py-5 space-y-4">
+            <p className="text-sm text-slate-500">Crée un mois de paie avec tous les agents en poste. Les jours travaillés seront automatiquement calculés depuis les pointages.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Mois</label>
+                <select value={createMonthForm.month} onChange={e => setCreateMonthForm(f => ({ ...f, month: +e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40">
+                  {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{new Date(2000, i).toLocaleString('fr-FR', { month: 'long' })}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Année</label>
+                <input type="number" value={createMonthForm.year} onChange={e => setCreateMonthForm(f => ({ ...f, year: +e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+              </div>
             </div>
-            <button onClick={() => {
-              const activeAgents = agents.filter((a: any) => a.status === 'EN_POSTE')
-              setSelectedAgentIds(new Set(activeAgents.map((a: any) => a.id)))
-            }} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg font-medium">Tout sélectionner</button>
-            <button onClick={() => setSelectedAgentIds(new Set())} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg font-medium">Tout désélectionner</button>
-          </div>
-          <div className="flex-1 overflow-y-auto px-6 py-3">
-            {(() => {
-              const activeAgents = agents.filter((a: any) => a.status === 'EN_POSTE')
-              const filtered = genSearch
-                ? activeAgents.filter((a: any) => {
-                    const name = `${a.user?.firstName ?? ''} ${a.user?.lastName ?? ''}`.toLowerCase()
-                    const mat = (a.matricule ?? '').toLowerCase()
-                    return name.includes(genSearch.toLowerCase()) || mat.includes(genSearch.toLowerCase())
-                  })
-                : activeAgents
-              if (filtered.length === 0) {
-                return <div className="py-8 text-center text-slate-400 text-sm">Aucun agent trouvé</div>
-              }
-              return (
-                <div className="divide-y divide-slate-50">
-                  {filtered.map((a: any) => {
-                    const checked = selectedAgentIds.has(a.id)
-                    return (
-                      <label key={a.id} className="flex items-center gap-3 py-2.5 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded-lg">
-                        <input type="checkbox" checked={checked}
-                          onChange={() => {
-                            setSelectedAgentIds(prev => {
-                              const next = new Set(prev)
-                              if (next.has(a.id)) next.delete(a.id)
-                              else next.add(a.id)
-                              return next
-                            })
-                          }}
-                          className="w-4 h-4 rounded text-sagard-yellow focus:ring-sagard-yellow/30"
-                        />
-                        <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-500">
-                          {(a.user?.firstName?.[0] ?? '?')}{(a.user?.lastName?.[0] ?? '')}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-800">{a.user?.firstName} {a.user?.lastName}</p>
-                          <p className="text-xs text-slate-400">{a.matricule} · {a.position}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-slate-400">Salaire base</p>
-                          <p className="text-sm font-semibold text-slate-700">{fmt(a.baseSalary ?? 0)}</p>
-                        </div>
-                      </label>
-                    )
-                  })}
-                </div>
-              )
-            })()}
-          </div>
-          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
-            <p className="text-sm text-slate-500">
-              <span className="font-bold text-slate-800">{selectedAgentIds.size}</span> agent(s) sélectionné(s)
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowGenModal(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-sm">Annuler</button>
-              <button onClick={handleGenerateSelected} disabled={genLoading || selectedAgentIds.size === 0}
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setShowCreateMonthModal(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-sm">Annuler</button>
+              <button onClick={handleCreateMonth} disabled={genLoading}
                 className="flex items-center gap-2 px-5 py-2 bg-sagard-yellow text-sagard-dark rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark disabled:opacity-60">
-                {genLoading ? <Loader2 size={14} className="animate-spin" /> : <DollarSign size={14} />} Générer la paie
+                {genLoading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Créer
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ═══ Modal Payer ligne de paie ═══ */}
+    {payLineData && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <DollarSign size={18} className="text-green-600" /> Payer le salaire
+            </h2>
+            <button onClick={() => setPayLineData(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} className="text-slate-500" /></button>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <div className="bg-slate-50 rounded-lg px-4 py-3">
+              <p className="font-semibold text-slate-800">{payLineData.agent?.user?.firstName} {payLineData.agent?.user?.lastName}</p>
+              <p className="text-xs text-slate-400 font-mono">{payLineData.agent?.matricule} · {payLineData.agent?.position}</p>
+              <div className="mt-2 flex justify-between text-sm">
+                <span className="text-slate-500">Net à payer</span>
+                <span className="font-bold text-green-700">{fmt(payLineData.netSalary)}</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Compte de trésorerie à débiter</label>
+              <select value={payForm.treasuryAccountId} onChange={e => setPayForm(f => ({ ...f, treasuryAccountId: e.target.value }))}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40">
+                <option value="">— Sélectionner —</option>
+                {treasuryAccounts.map((a: any) => (
+                  <option key={a.id} value={a.id}>{a.name} — Solde: {fmt(a.balance)}</option>
+                ))}
+              </select>
+              {payForm.treasuryAccountId && (() => {
+                const acc = treasuryAccounts.find((a: any) => a.id === payForm.treasuryAccountId)
+                if (acc && Number(acc.balance) < Number(payLineData.netSalary)) {
+                  return <p className="text-xs text-red-500 mt-1">⚠ Solde insuffisant sur ce compte</p>
+                }
+                return null
+              })()}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Mode de paiement</label>
+              <select value={payForm.paymentMethod} onChange={e => setPayForm(f => ({ ...f, paymentMethod: e.target.value }))}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40">
+                <option value="VIREMENT_BANCAIRE">Virement bancaire</option>
+                <option value="ESPECE">Espèces</option>
+                <option value="CHEQUE">Chèque</option>
+                <option value="MOBILE_MONEY">Mobile money</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Référence (optionnel)</label>
+              <input type="text" value={payForm.reference} onChange={e => setPayForm(f => ({ ...f, reference: e.target.value }))}
+                placeholder="N° chèque, référence virement..."
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setPayLineData(null)} className="px-4 py-2 rounded-lg border border-slate-200 text-sm">Annuler</button>
+              <button onClick={handlePayLine} disabled={paySaving || !payForm.treasuryAccountId}
+                className="flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 disabled:opacity-60">
+                {paySaving ? <Loader2 size={14} className="animate-spin" /> : <DollarSign size={14} />} Payer
               </button>
             </div>
           </div>
