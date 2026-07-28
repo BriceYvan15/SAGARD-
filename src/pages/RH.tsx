@@ -43,6 +43,12 @@ const STEP_LABELS: Record<string, string> = {
   MISE_EN_SERVICE: 'Mise en service',
 }
 
+function fmtHours(hours: number): string {
+  const h = Math.floor(hours)
+  const min = Math.round((hours - h) * 60)
+  return min > 0 ? `${h}h ${String(min).padStart(2, '0')}min` : `${h}h`
+}
+
 const EMPTY_CANDIDACY = { firstName: '', lastName: '', phone: '', email: '', cniNumber: '', position: '' }
 const EMPTY_DISCIPLINARY = { agentId: '', type: 'FAUTE', description: '', date: '', sanction: '' }
 const EMPTY_LEAVE = { agentId: '', type: 'CONGE_ANNUEL', startDate: '', endDate: '', reason: '' }
@@ -77,7 +83,7 @@ export default function RH() {
   const [payrollDetailLoading, setPayrollDetailLoading] = useState(false)
   // Edit line modal
   const [editLine, setEditLine] = useState<any | null>(null)
-  const [editForm, setEditForm] = useState({ daysWorked: 26, baseSalary: 0, bonuses: 0, deductions: 0, notes: '' })
+  const [editForm, setEditForm] = useState({ daysWorked: 0, hoursWorked: 0, baseSalary: 0, bonuses: 0, deductions: 0, notes: '' })
   const [editSaving, setEditSaving] = useState(false)
   // Block modal
   const [blockLine, setBlockLine] = useState<any | null>(null)
@@ -175,6 +181,7 @@ export default function RH() {
     setEditLine(line)
     setEditForm({
       daysWorked: line.daysWorked,
+      hoursWorked: Number(line.hoursWorked ?? 0),
       baseSalary: Number(line.baseSalary),
       bonuses: Number(line.bonuses),
       deductions: Number(line.deductions),
@@ -348,7 +355,10 @@ export default function RH() {
                                     </td>
                                     <td className="px-3 py-2.5 text-xs text-slate-600">{l.agent?.position ?? '—'}</td>
                                     <td className="px-3 py-2.5 text-xs text-slate-600">{l.agent?.deployments?.[0]?.site?.name ?? '—'}</td>
-                                    <td className="px-3 py-2.5 text-slate-600 text-center">{l.daysWorked}j</td>
+                                    <td className="px-3 py-2.5 text-slate-600 text-center">
+                                      <div>{l.daysWorked}j</div>
+                                      <div className="text-xs text-slate-400">{fmtHours(l.hoursWorked)}</div>
+                                    </td>
                                     <td className="px-3 py-2.5 text-slate-600">{fmt(l.baseSalary)}</td>
                                     <td className="px-3 py-2.5 text-emerald-600 font-medium">{Number(l.bonuses) > 0 ? `+${fmt(l.bonuses)}` : '—'}</td>
                                     <td className="px-3 py-2.5 font-semibold text-slate-800">{fmt(l.grossSalary)}</td>
@@ -1289,10 +1299,18 @@ export default function RH() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Jours travaillés</label>
-                <input type="number" min={0} max={31} value={editForm.daysWorked}
+                <label className="block text-xs font-medium text-slate-600 mb-1">Vacations (jours)</label>
+                <input type="number" min={0} max={62} value={editForm.daysWorked}
                   onChange={e => setEditForm(f => ({ ...f, daysWorked: +e.target.value }))}
                   className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                <p className="text-xs text-slate-400 mt-1">1 vacation = 12h (JOUR ou NUIT) = 2500 FCFA</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Heures travaillées</label>
+                <input type="number" min={0} step={0.01} value={editForm.hoursWorked}
+                  onChange={e => setEditForm(f => ({ ...f, hoursWorked: +e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                <p className="text-xs text-slate-400 mt-1">{fmtHours(editForm.hoursWorked)}</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Salaire de base</label>
@@ -1324,11 +1342,11 @@ export default function RH() {
             <div className="bg-slate-50 rounded-lg px-4 py-3 flex justify-between text-sm">
               <div>
                 <p className="text-xs text-slate-400">Brut calculé</p>
-                <p className="font-bold text-slate-800">{fmt(Math.round((editForm.baseSalary / 26) * editForm.daysWorked) + editForm.bonuses)}</p>
+                <p className="font-bold text-slate-800">{fmt(editForm.daysWorked * 2500 + editForm.bonuses)}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-slate-400">Net calculé</p>
-                <p className="font-bold text-green-700">{fmt(Math.max(Math.round((editForm.baseSalary / 26) * editForm.daysWorked) + editForm.bonuses - editForm.deductions, 0))}</p>
+                <p className="font-bold text-green-700">{fmt(Math.max(editForm.daysWorked * 2500 + editForm.bonuses - editForm.deductions, 0))}</p>
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">
@@ -1414,7 +1432,7 @@ export default function RH() {
                 <p className="text-sm font-semibold text-slate-700">
                   {String(payslipData.payroll?.month).padStart(2, '0')}/{payslipData.payroll?.year}
                 </p>
-                <p className="text-xs text-slate-400">{payslipData.daysWorked}j travaillés · {payslipData.hoursWorked}h</p>
+                <p className="text-xs text-slate-400">{payslipData.daysWorked}j travaillés · {fmtHours(payslipData.hoursWorked)}</p>
               </div>
             </div>
 
@@ -1458,7 +1476,7 @@ export default function RH() {
                   .credit{color:#059669}.debit{color:#dc2626}
                   @media print{body{padding:20px}}
                 </style></head><body>
-                <div class="header"><div><div class="company">SAGARD SÉCURITÉ</div><div class="subtitle">Fiche de paie</div></div><div style="text-align:right"><strong>${String(payslipData.payroll?.month).padStart(2,'0')}/${payslipData.payroll?.year}</strong><br/><span class="subtitle">${payslipData.daysWorked}j travaillés</span></div></div>
+                <div class="header"><div><div class="company">SAGARD SÉCURITÉ</div><div class="subtitle">Fiche de paie</div></div><div style="text-align:right"><strong>${String(payslipData.payroll?.month).padStart(2,'0')}/${payslipData.payroll?.year}</strong><br/><span class="subtitle">${payslipData.daysWorked}j travaillés · ${fmtHours(payslipData.hoursWorked)}</span></div></div>
                 <p><strong>${payslipData.agent?.user?.firstName} ${payslipData.agent?.user?.lastName}</strong> — ${payslipData.agent?.matricule}</p>
                 ${printArea.innerHTML}
                 </body></html>`)
