@@ -27,3 +27,4 @@ export const getContractExpiryAlerts = (days?: number) => api.get('/hr/alerts/co
 export const getIndisciplinedAgents  = () => api.get('/hr/alerts/indisciplined').then(r => r.data)
 export const getHrStats              = () => api.get('/hr/stats').then(r => r.data)
 export const getContracts            = (p?: { status?: string; contractType?: string }) => api.get('/hr/contracts', { params: p }).then(r => r.data)
+export const getWorkStats            = (agentId: string, p?: { month?: number; year?: number }) => api.get(`/hr/agents/${agentId}/work-stats`, { params: p }).then(r => r.data)
