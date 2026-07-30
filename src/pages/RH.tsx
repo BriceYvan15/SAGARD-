@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Users, DollarSign, Calendar, AlertTriangle, CheckCircle, Clock, Loader2, Plus, X, Award, UserPlus, FileText, Eye, Briefcase, Ban, Pencil, ShieldOff, ShieldCheck, Search, Trash2, TrendingUp, Timer, Target, Zap } from 'lucide-react'
 import { useApi } from '../lib/useApi'
@@ -111,9 +111,11 @@ export default function RH() {
     finally { setWorkStatsLoading(false) }
   }
 
-  // Create month modal
-  const [showCreateMonthModal, setShowCreateMonthModal] = useState(false)
-  const [createMonthForm, setCreateMonthForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear() })
+  // Payroll period selector (replaces old create-month modal)
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [payrollFilter, setPayrollFilter] = useState<'all' | 'PAYE' | 'BROUILLON' | 'VALIDE' | 'BLOQUE'>('all')
+  const [payrollTableSearch, setPayrollTableSearch] = useState('')
   // Pay line modal
   const [payLineData, setPayLineData] = useState<any | null>(null)
   const [payForm, setPayForm] = useState({ treasuryAccountId: '', paymentMethod: 'VIREMENT_BANCAIRE', reference: '' })
@@ -139,20 +141,29 @@ export default function RH() {
   async function handleCreateMonth() {
     setGenLoading(true)
     try {
-      await createPayrollMonth(createMonthForm.month, createMonthForm.year)
-      setShowCreateMonthModal(false)
+      await createPayrollMonth(selectedMonth, selectedYear)
       reloadP()
     } catch (e: any) {
       alert(e.response?.data?.message ?? 'Erreur création mois de paie')
     } finally { setGenLoading(false) }
   }
 
+  // Auto-load payroll detail when period changes
+  useEffect(() => {
+    if (pLoad || !payrolls) return
+    const current = ((payrolls as any[]) ?? []).find((p: any) => p.month === selectedMonth && p.year === selectedYear)
+    if (!current) { setPayrollDetail(null); return }
+    setPayrollDetailLoading(true)
+    getPayrollDetail(current.id).then(setPayrollDetail).catch(() => setPayrollDetail(null)).finally(() => setPayrollDetailLoading(false))
+  }, [selectedMonth, selectedYear, payrolls, pLoad])
+
   async function handleValidateLine(lineId: string) {
     setAction(lineId)
     try {
       await validatePayrollLine(lineId)
-      if (expandedPayroll) {
-        const detail = await getPayrollDetail(expandedPayroll)
+      const current = ((payrolls as any[]) ?? []).find((p: any) => p.month === selectedMonth && p.year === selectedYear)
+      if (current) {
+        const detail = await getPayrollDetail(current.id)
         setPayrollDetail(detail)
       }
       reloadP()
@@ -166,8 +177,9 @@ export default function RH() {
     setPaySaving(true)
     try {
       await payPayrollLine(payLineData.id, payForm)
-      if (expandedPayroll) {
-        const detail = await getPayrollDetail(expandedPayroll)
+      const current = ((payrolls as any[]) ?? []).find((p: any) => p.month === selectedMonth && p.year === selectedYear)
+      if (current) {
+        const detail = await getPayrollDetail(current.id)
         setPayrollDetail(detail)
       }
       reloadP()
@@ -211,8 +223,9 @@ export default function RH() {
     setEditSaving(true)
     try {
       await updatePayrollLine(editLine.id, editForm)
-      if (expandedPayroll) {
-        const detail = await getPayrollDetail(expandedPayroll)
+      const current = ((payrolls as any[]) ?? []).find((p: any) => p.month === selectedMonth && p.year === selectedYear)
+      if (current) {
+        const detail = await getPayrollDetail(current.id)
         setPayrollDetail(detail)
       }
       reloadP()
@@ -227,8 +240,9 @@ export default function RH() {
     setBlockSaving(true)
     try {
       await toggleBlockPayrollLine(blockLine.id, !blockLine.blocked, blockReason || undefined)
-      if (expandedPayroll) {
-        const detail = await getPayrollDetail(expandedPayroll)
+      const current2 = ((payrolls as any[]) ?? []).find((p: any) => p.month === selectedMonth && p.year === selectedYear)
+      if (current2) {
+        const detail = await getPayrollDetail(current2.id)
         setPayrollDetail(detail)
       }
       reloadP()
@@ -528,203 +542,207 @@ export default function RH() {
             </div>
           )}
 
-          {/* ─── SOUS-TAB: PAIE (existing) ─── */}
+          {/* ─── SOUS-TAB: PAIE (nouveau design) ─── */}
           {payrollSubTab === 'payroll' && (
           <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-slate-800">Gestion de la paie</h2>
-            <button onClick={() => { setCreateMonthForm({ month: now.getMonth() + 1, year: now.getFullYear() }); setShowCreateMonthModal(true) }}
-              className="flex items-center gap-2 bg-sagard-yellow hover:bg-sagard-yellow-dark text-sagard-dark text-sm font-bold px-4 py-2 rounded-xl transition-colors">
-              <Plus size={16} /> Nouveau mois
-            </button>
-          </div>
+            {/* Sélecteur de période */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <select value={selectedMonth} onChange={e => setSelectedMonth(+e.target.value)}
+                  className="px-3 py-2 text-sm font-medium border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/30 bg-white">
+                  {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{new Date(2000, i).toLocaleString('fr-FR', { month: 'long' })}</option>)}
+                </select>
+                <input type="number" value={selectedYear} onChange={e => setSelectedYear(+e.target.value)}
+                  className="w-24 px-3 py-2 text-sm font-medium border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/30 bg-white" />
+              </div>
+            </div>
 
-          {pLoad ? (
-            <div className="flex justify-center py-12"><Loader2 className="animate-spin text-slate-400" /></div>
-          ) : (
-            <div className="space-y-3">
-              {((payrolls as any[]) ?? []).map((p: any) => {
-                const isExpanded = expandedPayroll === p.id
-                const lines = payrollDetail?.lines ?? p.lines ?? []
-                const filteredLines = payrollSearch
-                  ? lines.filter((l: any) => {
-                      const name = `${l.agent?.user?.firstName ?? ''} ${l.agent?.user?.lastName ?? ''}`.toLowerCase()
-                      const mat = (l.agent?.matricule ?? '').toLowerCase()
-                      return name.includes(payrollSearch.toLowerCase()) || mat.includes(payrollSearch.toLowerCase())
-                    })
-                  : lines
-                const paidCount = p.paidCount ?? lines.filter((l: any) => l.paymentStatus === 'PAYE').length
-                const totalLines = p.totalLines ?? lines.length
-                const blockedCount = p.blockedCount ?? lines.filter((l: any) => l.blocked).length
+            {pLoad ? (
+              <div className="flex justify-center py-12"><Loader2 className="animate-spin text-slate-400" /></div>
+            ) : (() => {
+              const currentPayroll = ((payrolls as any[]) ?? []).find((p: any) => p.month === selectedMonth && p.year === selectedYear)
+              if (!currentPayroll) {
                 return (
-                  <div key={p.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                    <div className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-slate-50" onClick={() => handleExpandPayroll(p)}>
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-sagard-yellow/20 rounded-lg flex items-center justify-center"><DollarSign size={18} className="text-sagard-yellow-dark" /></div>
-                        <div>
-                          <p className="font-bold text-slate-800">{String(p.month).padStart(2,'0')}/{p.year}</p>
-                          <p className="text-xs text-slate-400">
-                            {totalLines} agents · {paidCount} payé(s)
-                            {blockedCount > 0 && <span className="text-red-500 font-medium"> · {blockedCount} bloqué(s)</span>}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-6">
-                        <div className="text-right">
-                          <p className="text-xs text-slate-400">Brut</p>
-                          <p className="font-bold text-slate-800">{fmt(p.totalBrut)}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-slate-400">Net</p>
-                          <p className="font-bold text-green-700">{fmt(p.totalNet)}</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={(e) => { e.stopPropagation(); setDeletePayrollItem(p) }} title="Supprimer"
-                            className="text-xs bg-red-50 text-red-600 hover:bg-red-100 px-2.5 py-1.5 rounded-lg font-medium flex items-center gap-1">
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                        <span className={`transition-transform text-slate-400 ${isExpanded ? 'rotate-180' : ''}`}>▼</span>
-                      </div>
-                    </div>
-                    {isExpanded && (
-                      <div className="border-t border-slate-100">
-                        {/* Search bar */}
-                        <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-3">
-                          <div className="relative flex-1 max-w-xs">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                              value={payrollSearch}
-                              onChange={e => setPayrollSearch(e.target.value)}
-                              placeholder="Rechercher un agent..."
-                              className="w-full pl-9 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/30"
-                            />
-                          </div>
-                          <span className="text-xs text-slate-400">{filteredLines.length} agent(s)</span>
-                        </div>
-                        {payrollDetailLoading ? (
-                          <div className="flex justify-center py-8"><Loader2 className="animate-spin text-slate-300" size={20} /></div>
-                        ) : (
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <thead className="bg-slate-50"><tr>
-                                {['Agent','Poste','Site','Jours','Salaire base','Primes','Brut','Retenues','Net','Statut','Actions'].map(h => (
-                                  <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase whitespace-nowrap">{h}</th>
-                                ))}
-                              </tr></thead>
-                              <tbody className="divide-y divide-slate-50">
-                                {filteredLines.map((l: any) => {
-                                  const lst = STATUS_LINE[l.paymentStatus] ?? { label: l.paymentStatus, cls: 'bg-slate-100 text-slate-600' }
-                                  return (
-                                  <tr key={l.id} className={`hover:bg-slate-50 ${l.blocked ? 'bg-red-50/50' : ''}`}>
-                                    <td className="px-3 py-2.5">
-                                      <div className="font-medium text-slate-800">{l.agent?.user?.firstName} {l.agent?.user?.lastName}</div>
-                                      <div className="text-xs text-slate-400 font-mono">{l.agent?.matricule}</div>
-                                    </td>
-                                    <td className="px-3 py-2.5 text-xs text-slate-600">{l.agent?.position ?? '—'}</td>
-                                    <td className="px-3 py-2.5 text-xs text-slate-600">{l.agent?.deployments?.[0]?.site?.name ?? '—'}</td>
-                                    <td className="px-3 py-2.5 text-slate-600 text-center">
-                                      <div>{l.daysWorked}j</div>
-                                      <div className="text-xs text-slate-400">{fmtHours(l.hoursWorked)}</div>
-                                    </td>
-                                    <td className="px-3 py-2.5 text-slate-600">{fmt(l.baseSalary)}</td>
-                                    <td className="px-3 py-2.5 text-emerald-600 font-medium">{Number(l.bonuses) > 0 ? `+${fmt(l.bonuses)}` : '—'}</td>
-                                    <td className="px-3 py-2.5 font-semibold text-slate-800">{fmt(l.grossSalary)}</td>
-                                    <td className="px-3 py-2.5 text-red-600 font-medium">{Number(l.deductions) > 0 ? `-${fmt(l.deductions)}` : '—'}</td>
-                                    <td className="px-3 py-2.5">
-                                      {l.blocked ? (
-                                        <div>
-                                          <span className="font-bold text-red-600 line-through">{fmt(l.netSalary)}</span>
-                                          <div className="text-xs text-red-500 flex items-center gap-1 mt-0.5"><Ban size={10} /> {l.blockReason ?? 'Bloqué'}</div>
-                                        </div>
-                                      ) : (
-                                        <span className="font-bold text-green-700">{fmt(l.netSalary)}</span>
-                                      )}
-                                    </td>
-                                    <td className="px-3 py-2.5">
-                                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${lst.cls}`}>{lst.label}</span>
-                                    </td>
-                                    <td className="px-3 py-2.5">
-                                      <div className="flex items-center gap-1">
-                                        {l.paymentStatus === 'BROUILLON' && (
-                                          <>
-                                            <button onClick={() => openEditLine(l)} title="Modifier"
-                                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-                                              <Pencil size={13} />
-                                            </button>
-                                            <button onClick={() => { setBlockLine(l); setBlockReason(l.blockReason ?? '') }} title="Bloquer"
-                                              className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors">
-                                              <ShieldOff size={13} />
-                                            </button>
-                                            <button onClick={() => handleValidateLine(l.id)} disabled={actionLoading === l.id} title="Valider"
-                                              className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors">
-                                              {actionLoading === l.id ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={13} />}
-                                            </button>
-                                          </>
-                                        )}
-                                        {l.paymentStatus === 'VALIDE' && (
-                                          <>
-                                            <button onClick={() => openEditLine(l)} title="Modifier"
-                                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-                                              <Pencil size={13} />
-                                            </button>
-                                            <button onClick={() => { setBlockLine(l); setBlockReason(l.blockReason ?? '') }} title="Bloquer"
-                                              className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors">
-                                              <ShieldOff size={13} />
-                                            </button>
-                                            <button onClick={() => { setPayLineData(l); setPayForm({ treasuryAccountId: '', paymentMethod: 'VIREMENT_BANCAIRE', reference: '' }) }} title="Payer"
-                                              className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors">
-                                              <DollarSign size={13} />
-                                            </button>
-                                          </>
-                                        )}
-                                        {l.paymentStatus === 'BLOQUE' && (
-                                          <button onClick={() => { setBlockLine(l); setBlockReason(l.blockReason ?? '') }} title="Débloquer"
-                                            className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors">
-                                            <ShieldCheck size={13} />
-                                          </button>
-                                        )}
-                                        <button onClick={async () => { setPayslipLoading(true); try { const data = await getPayslip(l.id); setPayslipData(data) } catch { alert('Erreur chargement fiche') } finally { setPayslipLoading(false) } }}
-                                          className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors" title="Voir fiche">
-                                          <Eye size={13} />
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                  )
-                                })}
-                                {filteredLines.length === 0 && (
-                                  <tr><td colSpan={11} className="px-4 py-8 text-center text-slate-400 text-sm">Aucun agent trouvé</td></tr>
-                                )}
-                              </tbody>
-                              {filteredLines.length > 0 && (
-                                <tfoot className="bg-slate-50 border-t-2 border-slate-100">
-                                  <tr className="font-bold">
-                                    <td colSpan={4} className="px-3 py-3 text-slate-700">Total ({filteredLines.length} agents)</td>
-                                    <td className="px-3 py-3 text-slate-700">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.baseSalary), 0))}</td>
-                                    <td className="px-3 py-3 text-emerald-700">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.bonuses), 0))}</td>
-                                    <td className="px-3 py-3 text-slate-800">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.grossSalary), 0))}</td>
-                                    <td className="px-3 py-3 text-red-700">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.deductions), 0))}</td>
-                                    <td className="px-3 py-3 text-green-700">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.netSalary), 0))}</td>
-                                    <td></td><td></td>
-                                  </tr>
-                                </tfoot>
-                              )}
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-10 text-center">
+                    <DollarSign size={40} className="mx-auto mb-3 text-slate-300" />
+                    <p className="text-slate-500 font-medium mb-1">Aucune paie pour {new Date(2000, selectedMonth - 1).toLocaleString('fr-FR', { month: 'long' })} {selectedYear}</p>
+                    <p className="text-sm text-slate-400 mb-4">Générez la paie pour cette période. Les jours travaillés seront calculés automatiquement depuis les pointages.</p>
+                    <button onClick={handleCreateMonth} disabled={genLoading}
+                      className="inline-flex items-center gap-2 bg-sagard-yellow hover:bg-sagard-yellow-dark text-sagard-dark text-sm font-bold px-5 py-2.5 rounded-xl transition-colors disabled:opacity-60">
+                      {genLoading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Générer la paie
+                    </button>
                   </div>
                 )
-              })}
-              {((payrolls as any[]) ?? []).length === 0 && (
-                <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-400 text-sm">
-                  <DollarSign size={40} className="mx-auto mb-3 opacity-30" /> Aucune fiche de paie. Cliquez sur « Nouveau mois » pour commencer.
+              }
+
+              const lines = payrollDetail?.lines ?? currentPayroll.lines ?? []
+              const allLines = lines
+              const filteredByStatus = payrollFilter === 'all' ? allLines : allLines.filter((l: any) => l.paymentStatus === payrollFilter)
+              const filteredLines = payrollTableSearch
+                ? filteredByStatus.filter((l: any) => {
+                    const name = `${l.agent?.user?.firstName ?? ''} ${l.agent?.user?.lastName ?? ''}`.toLowerCase()
+                    const mat = (l.agent?.matricule ?? '').toLowerCase()
+                    return name.includes(payrollTableSearch.toLowerCase()) || mat.includes(payrollTableSearch.toLowerCase())
+                  })
+                : filteredByStatus
+              const paidCount = allLines.filter((l: any) => l.paymentStatus === 'PAYE').length
+              const valCount = allLines.filter((l: any) => l.paymentStatus === 'VALIDE').length
+              const broCount = allLines.filter((l: any) => l.paymentStatus === 'BROUILLON').length
+              const bloCount = allLines.filter((l: any) => l.paymentStatus === 'BLOQUE').length
+              const periodLabel = `1er au ${new Date(selectedYear, selectedMonth, 0).getDate()} ${new Date(2000, selectedMonth - 1).toLocaleString('fr-FR', { month: 'long' })} ${selectedYear}`
+
+              return (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                  {/* En-tête */}
+                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 p-6">
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-800">Employés</h2>
+                      <p className="text-sm text-slate-400">{allLines.length} sur {allLines.length} · période du {periodLabel}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <Search size={14} className="text-slate-400" />
+                        <input placeholder="Rechercher…" value={payrollTableSearch} onChange={e => setPayrollTableSearch(e.target.value)}
+                          className="w-36 bg-transparent text-sm outline-none placeholder:text-slate-400" />
+                      </div>
+                      <button onClick={handleCreateMonth} disabled={genLoading} title="Régénérer la paie"
+                        className="flex items-center gap-2 bg-sagard-yellow hover:bg-sagard-yellow-dark text-sagard-dark rounded-lg px-4 py-2 text-sm font-bold transition-colors disabled:opacity-60">
+                        {genLoading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                        <span className="hidden sm:inline">Régénérer</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Filtres pills */}
+                  <div className="flex flex-wrap gap-2 border-b border-slate-100 px-6 py-3">
+                    {([
+                      { key: 'all', label: 'Tous', count: allLines.length },
+                      { key: 'PAYE', label: 'Payé', count: paidCount },
+                      { key: 'VALIDE', label: 'À payer', count: valCount },
+                      { key: 'BROUILLON', label: 'Brouillon', count: broCount },
+                      { key: 'BLOQUE', label: 'Bloqué', count: bloCount },
+                    ] as const).map(f => (
+                      <button key={f.key} onClick={() => setPayrollFilter(f.key)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${payrollFilter === f.key ? 'bg-slate-800 text-white' : 'border border-slate-200 text-slate-500 hover:text-slate-700'}`}>
+                        {f.label} {f.count > 0 && <span className="opacity-60">({f.count})</span>}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Tableau */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
+                          <th className="px-6 py-3 font-medium">Employé</th>
+                          <th className="hidden px-6 py-3 font-medium md:table-cell">Site</th>
+                          <th className="hidden px-6 py-3 font-medium sm:table-cell text-right">Brut</th>
+                          <th className="px-6 py-3 font-medium text-right">Net</th>
+                          <th className="hidden px-6 py-3 font-medium sm:table-cell">Statut</th>
+                          <th className="px-6 py-3 font-medium text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {filteredLines.map((l: any) => {
+                          const lst = STATUS_LINE[l.paymentStatus] ?? { label: l.paymentStatus, cls: 'bg-slate-100 text-slate-600' }
+                          const firstName = l.agent?.user?.firstName ?? ''
+                          const lastName = l.agent?.user?.lastName ?? ''
+                          const initials = `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase()
+                          const fullName = `${firstName} ${lastName}`.trim()
+                          const position = l.agent?.position ?? 'Agent'
+                          const siteName = l.agent?.deployments?.[0]?.site?.name ?? '—'
+                          return (
+                            <tr key={l.id} className={`cursor-pointer transition-colors hover:bg-slate-50 ${l.blocked ? 'bg-red-50/40' : ''}`}
+                              onClick={() => { setPayLineData(l); setPayForm({ treasuryAccountId: '', paymentMethod: 'VIREMENT_BANCAIRE', reference: '' }) }}>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                  <span className="flex size-9 items-center justify-center rounded-full bg-slate-100 text-xs font-medium text-slate-600">{initials}</span>
+                                  <div className="leading-tight">
+                                    <p className="font-medium text-slate-800">{fullName}</p>
+                                    <p className="text-xs text-slate-400">{position} · {l.agent?.matricule ?? '—'}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="hidden px-6 py-4 text-slate-500 md:table-cell">{siteName}</td>
+                              <td className="hidden px-6 py-4 text-right text-slate-500 sm:table-cell">{fmt(l.grossSalary)}</td>
+                              <td className="px-6 py-4 text-right font-medium text-slate-800">
+                                {l.blocked ? (
+                                  <span className="text-red-600 line-through">{fmt(l.netSalary)}</span>
+                                ) : (
+                                  fmt(l.netSalary)
+                                )}
+                              </td>
+                              <td className="hidden px-6 py-4 sm:table-cell">
+                                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${lst.cls}`}>{lst.label}</span>
+                              </td>
+                              <td className="px-6 py-4" onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center justify-end gap-1">
+                                  {l.paymentStatus === 'BROUILLON' && (
+                                    <>
+                                      <button onClick={() => openEditLine(l)} title="Modifier"
+                                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                                        <Pencil size={14} />
+                                      </button>
+                                      <button onClick={() => { setBlockLine(l); setBlockReason(l.blockReason ?? '') }} title="Bloquer"
+                                        className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors">
+                                        <ShieldOff size={14} />
+                                      </button>
+                                      <button onClick={() => handleValidateLine(l.id)} disabled={actionLoading === l.id} title="Valider"
+                                        className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors">
+                                        {actionLoading === l.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                                      </button>
+                                    </>
+                                  )}
+                                  {l.paymentStatus === 'VALIDE' && (
+                                    <>
+                                      <button onClick={() => openEditLine(l)} title="Modifier"
+                                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
+                                        <Pencil size={14} />
+                                      </button>
+                                      <button onClick={() => { setBlockLine(l); setBlockReason(l.blockReason ?? '') }} title="Bloquer"
+                                        className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors">
+                                        <ShieldOff size={14} />
+                                      </button>
+                                      <button onClick={() => { setPayLineData(l); setPayForm({ treasuryAccountId: '', paymentMethod: 'VIREMENT_BANCAIRE', reference: '' }) }} title="Payer"
+                                        className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors">
+                                        <DollarSign size={14} />
+                                      </button>
+                                    </>
+                                  )}
+                                  {l.paymentStatus === 'BLOQUE' && (
+                                    <button onClick={() => { setBlockLine(l); setBlockReason(l.blockReason ?? '') }} title="Débloquer"
+                                      className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors">
+                                      <ShieldCheck size={14} />
+                                    </button>
+                                  )}
+                                  <button onClick={async () => { setPayslipLoading(true); try { const data = await getPayslip(l.id); setPayslipData(data) } catch { alert('Erreur chargement fiche') } finally { setPayslipLoading(false) } }}
+                                    className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors" title="Voir fiche">
+                                    <Eye size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                        {filteredLines.length === 0 && (
+                          <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm">Aucun agent trouvé</td></tr>
+                        )}
+                      </tbody>
+                      {filteredLines.length > 0 && (
+                        <tfoot className="bg-slate-50 border-t-2 border-slate-100">
+                          <tr className="font-bold">
+                            <td colSpan={2} className="px-6 py-3 text-slate-700">Total ({filteredLines.length} agents)</td>
+                            <td className="hidden px-6 py-3 text-right text-slate-700 sm:table-cell">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.grossSalary), 0))}</td>
+                            <td className="px-6 py-3 text-right text-green-700">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.netSalary), 0))}</td>
+                            <td colSpan={2}></td>
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
+              )
+            })()}
           </div>
         )}
         </div>
@@ -1443,44 +1461,6 @@ export default function RH() {
               <button onClick={handleDeletePayroll} disabled={deleteLoading}
                 className="flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 disabled:opacity-60">
                 {deleteLoading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Supprimer définitivement
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )}
-
-    {/* ═══ Modal Nouveau mois de paie ═══ */}
-    {showCreateMonthModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <Plus size={18} className="text-sagard-yellow-dark" /> Nouveau mois de paie
-            </h2>
-            <button onClick={() => setShowCreateMonthModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} className="text-slate-500" /></button>
-          </div>
-          <div className="px-6 py-5 space-y-4">
-            <p className="text-sm text-slate-500">Crée un mois de paie avec tous les agents en poste. Les jours travaillés seront automatiquement calculés depuis les pointages.</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Mois</label>
-                <select value={createMonthForm.month} onChange={e => setCreateMonthForm(f => ({ ...f, month: +e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40">
-                  {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{new Date(2000, i).toLocaleString('fr-FR', { month: 'long' })}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Année</label>
-                <input type="number" value={createMonthForm.year} onChange={e => setCreateMonthForm(f => ({ ...f, year: +e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <button onClick={() => setShowCreateMonthModal(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-sm">Annuler</button>
-              <button onClick={handleCreateMonth} disabled={genLoading}
-                className="flex items-center gap-2 px-5 py-2 bg-sagard-yellow text-sagard-dark rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark disabled:opacity-60">
-                {genLoading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Créer
               </button>
             </div>
           </div>
