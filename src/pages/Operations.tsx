@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import {
-  Activity, Search, Sun, Moon, Clock, Navigation,
+  Activity, Search, Sun, Moon, Clock, Navigation, Calendar,
   Loader2, Plus, X, MapPin, UserCheck, Play, Square, ArrowRightLeft, History
 } from 'lucide-react'
 import AgentMap from '../components/AgentMap'
 import { useApi } from '../lib/useApi'
 import { fmtDate } from '../lib/utils'
 import {
-  getTodayPointages, getPointagesByDate, getDeployments, createDeployment, activateDeployment,
+  getTodayPointages, getPointagesByDate, getPointagesRange, getDeployments, createDeployment, activateDeployment,
   endDeployment, transferDeployment, getTransfers
 } from '../services/operations.service'
 import { getAgents } from '../services/agents.service'
@@ -43,18 +43,38 @@ export default function Operations() {
   const [tab, setTab] = useState<Tab>('pointages')
   const [search, setSearch] = useState('')
   const [shiftFilter, setShift] = useState('all')
+  const [siteFilter, setSiteFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
 
-  // Date filter for pointages
-  const [ptDate, setPtDate] = useState('') // empty = today
+  // Date filter for pointages: 'today' | 'week' | 'all' | 'custom'
+  const [dateMode, setDateMode] = useState<'today' | 'week' | 'all' | 'custom'>('today')
+  const [ptDate, setPtDate] = useState('')
   const [ptData, setPtData] = useState<any[] | null>(null)
   const [ptLoading, setPtLoading] = useState(false)
 
-  const loadPointages = async (date: string) => {
+  const loadPointages = async () => {
     setPtLoading(true)
     try {
-      const data = date
-        ? await getPointagesByDate(date)
-        : await getTodayPointages()
+      let data: any[]
+      if (dateMode === 'today') {
+        data = await getTodayPointages()
+      } else if (dateMode === 'custom' && ptDate) {
+        data = await getPointagesByDate(ptDate)
+      } else if (dateMode === 'week') {
+        const now = new Date()
+        const monday = new Date(now)
+        const day = monday.getDay() || 7
+        monday.setDate(monday.getDate() - day + 1)
+        const sunday = new Date(monday)
+        sunday.setDate(sunday.getDate() + 6)
+        data = await getPointagesRange(monday.toISOString().slice(0, 10), sunday.toISOString().slice(0, 10))
+      } else {
+        // all: last 30 days
+        const end = new Date()
+        const start = new Date()
+        start.setDate(start.getDate() - 30)
+        data = await getPointagesRange(start.toISOString().slice(0, 10), end.toISOString().slice(0, 10))
+      }
       setPtData(data)
     } catch {
       setPtData([])
@@ -63,7 +83,7 @@ export default function Operations() {
     }
   }
 
-  useEffect(() => { loadPointages(ptDate) }, [ptDate])
+  useEffect(() => { loadPointages() }, [dateMode, ptDate])
   const { data: depData, loading: depLoading, reload: reloadDeps } = useApi(getDeployments)
   const { data: agentsData } = useApi(getAgents)
   const { data: sitesData }  = useApi(getSites)
@@ -125,9 +145,15 @@ export default function Operations() {
     const q = search.toLowerCase()
     const agentName = `${op.agent?.user?.firstName ?? ''} ${op.agent?.user?.lastName ?? ''}`.toLowerCase()
     const siteName  = (op.deployment?.site?.name ?? sitesMap.get(op.siteId)?.name ?? '').toLowerCase()
-    const matchSearch = agentName.includes(q) || siteName.includes(q)
+    const matchSearch = !q || agentName.includes(q) || siteName.includes(q)
     const matchShift  = shiftFilter === 'all' || (op.shift ?? '').toLowerCase() === shiftFilter
-    return matchSearch && matchShift
+    const matchSite   = !siteFilter || op.siteId === siteFilter || op.deployment?.siteId === siteFilter
+    const isDone = !!op.checkOutTime
+    const matchStatus = statusFilter === 'all'
+      || (statusFilter === 'en_cours' && !isDone)
+      || (statusFilter === 'termine' && isDone)
+      || (statusFilter === 'retard' && (op.lateMinutes ?? 0) > 0)
+    return matchSearch && matchShift && matchSite && matchStatus
   })
 
   const today      = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -189,25 +215,90 @@ export default function Operations() {
       {/* ═══ TAB POINTAGES ═══ */}
       {tab === 'pointages' && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 border-b border-slate-100">
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <div className="relative flex-1 sm:w-72">
+          {/* Filter bar */}
+          <div className="flex flex-col gap-3 p-4 border-b border-slate-100">
+            {/* Row 1: Search + Date quick filters */}
+            <div className="flex flex-col md:flex-row gap-2 md:items-center">
+              {/* Search */}
+              <div className="relative flex-1 min-w-0">
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Agent, site..."
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher (agent, site, matricule)..."
+                  className="w-full pl-9 pr-9 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                {search && (
+                  <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-slate-100">
+                    <X size={14} className="text-slate-400" />
+                  </button>
+                )}
               </div>
-              <DatePicker value={ptDate} onChange={v => setPtDate(v)} className="w-40" />
-              {ptDate && (
-                <button onClick={() => setPtDate('')} className="px-3 py-2 text-xs font-medium bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 whitespace-nowrap">Aujourd'hui</button>
-              )}
+
+              {/* Date quick filters */}
+              <div className="flex gap-1 flex-wrap items-center">
+                {([
+                  { key: 'all', label: 'Toutes dates', icon: Calendar },
+                  { key: 'today', label: 'Aujourd'hui', icon: Calendar },
+                  { key: 'week', label: 'Cette semaine', icon: Calendar },
+                ] as const).map(d => {
+                  const Icon = d.icon
+                  return (
+                    <button key={d.key} onClick={() => { setDateMode(d.key); setPtDate('') }}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${dateMode === d.key ? 'bg-sagard-yellow text-sagard-dark' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                      <Icon size={13} /> {d.label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-            <div className="flex gap-2">
-              {([{ key: 'all', label: 'Toutes' }, { key: 'jour', label: 'Jour', icon: <Sun size={12}/> }, { key: 'nuit', label: 'Nuit', icon: <Moon size={12}/> }]).map(s => (
-                <button key={s.key} onClick={() => setShift(s.key)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${shiftFilter === s.key ? 'bg-sagard-yellow text-sagard-dark' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-                  {(s as any).icon}{s.label}
+
+            {/* Row 2: Filters (shift, site, status, custom date) */}
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              {/* Shift filter with count */}
+              <Select
+                value={shiftFilter}
+                onChange={v => setShift(v)}
+                size="sm"
+                className="w-full sm:w-44"
+                options={[
+                  { value: 'all', label: `Toutes vacations (${pointages.length})` },
+                  { value: 'jour', label: `Jour (${pointages.filter(p => (p.shift ?? '').toLowerCase() === 'jour').length})` },
+                  { value: 'nuit', label: `Nuit (${pointages.filter(p => (p.shift ?? '').toLowerCase() === 'nuit').length})` },
+                ]}
+              />
+
+              {/* Site filter */}
+              <Select
+                value={siteFilter}
+                onChange={v => setSiteFilter(v)}
+                size="sm"
+                className="w-full sm:w-52"
+                placeholder="Tous les sites"
+                options={sites.map((s: any) => ({ value: s.id, label: s.name }))}
+              />
+
+              {/* Status filter */}
+              <Select
+                value={statusFilter}
+                onChange={v => setStatusFilter(v)}
+                size="sm"
+                className="w-full sm:w-40"
+                options={[
+                  { value: 'all', label: 'Tous états' },
+                  { value: 'en_cours', label: 'En cours' },
+                  { value: 'termine', label: 'Terminé' },
+                  { value: 'retard', label: 'En retard' },
+                ]}
+              />
+
+              {/* Custom date picker */}
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  onClick={() => setDateMode('custom')}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${dateMode === 'custom' ? 'bg-sagard-yellow text-sagard-dark' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                  <Calendar size={13} /> Date précise
                 </button>
-              ))}
+                {dateMode === 'custom' && (
+                  <DatePicker value={ptDate} onChange={v => setPtDate(v)} placeholder="Choisir date" className="w-44" />
+                )}
+              </div>
             </div>
           </div>
           {ptLoading ? <div className="flex justify-center py-16"><Loader2 className="animate-spin text-slate-300" size={28} /></div> : (
