@@ -339,13 +339,56 @@ export default function RH() {
                         <div className={`h-full rounded-full ${workStatsData.attendanceRate >= 80 ? 'bg-green-500' : workStatsData.attendanceRate >= 50 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.min(workStatsData.attendanceRate, 100)}%` }} />
                       </div>
                     </div>
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-                      <div className="flex items-center gap-2 text-slate-400 mb-1">
-                        <DollarSign size={14} /><span className="text-xs font-medium uppercase">Gains estimés</span>
+                    <div className="bg-gradient-to-br from-sagard-yellow/10 to-amber-50 rounded-xl border border-sagard-yellow/20 shadow-sm p-4">
+                      <div className="flex items-center gap-2 text-sagard-yellow-dark mb-1">
+                        <DollarSign size={14} /><span className="text-xs font-medium uppercase">Net estimé</span>
                       </div>
-                      <p className="text-2xl font-black text-sagard-yellow-dark">{fmt(workStatsData.estimatedEarnings)} <span className="text-sm font-normal">F</span></p>
-                      <p className="text-xs text-slate-400 mt-1">{workStatsData.daysWorked} vacations × 2500 F</p>
+                      <p className="text-2xl font-black text-sagard-yellow-dark">{fmt(workStatsData.netEarnings)} <span className="text-sm font-normal">F</span></p>
+                      <p className="text-xs text-slate-400 mt-1">Brut: {fmt(workStatsData.grossEarnings)} F</p>
                     </div>
+                  </div>
+
+                  {/* Financial breakdown */}
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><DollarSign size={16} /> Décompte financier</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                        <span className="text-sm text-slate-600 font-medium">Gains bruts ({workStatsData.daysWorked} × {workStatsData.vacationRate} F)</span>
+                        <span className="font-bold text-green-600">+{fmt(workStatsData.grossEarnings)} F</span>
+                      </div>
+                      {workStatsData.extraServicesEarnings > 0 && (
+                        <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                          <span className="text-sm text-slate-600 font-medium">Services extra ({workStatsData.extraServicesCount})</span>
+                          <span className="font-bold text-emerald-600">+{fmt(workStatsData.extraServicesEarnings)} F</span>
+                        </div>
+                      )}
+                      {workStatsData.lateDeduction > 0 && (
+                        <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                          <span className="text-sm text-slate-600 font-medium">Pénalité retards ({workStatsData.lateCount} × {workStatsData.latePenaltyPerHour} F/h)</span>
+                          <span className="font-bold text-amber-600">-{fmt(workStatsData.lateDeduction)} F</span>
+                        </div>
+                      )}
+                      {workStatsData.missingDays > 0 && (
+                        <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                          <span className="text-sm text-slate-600 font-medium">Jours manqués ({workStatsData.missingDays}j · {fmtHours(workStatsData.missingHours)})</span>
+                          <span className="font-bold text-red-500">-{fmt(workStatsData.missingDaysDeduction)} F</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center bg-slate-50 rounded-lg px-4 py-3 mt-2">
+                        <span className="font-black text-slate-800">Net estimé</span>
+                        <span className="font-black text-sagard-yellow-dark text-lg">{fmt(workStatsData.netEarnings)} F</span>
+                      </div>
+                    </div>
+
+                    {workStatsData.rattrapageEligible && (
+                      <div className="mt-4 bg-blue-50 border border-blue-100 rounded-lg p-4 flex items-center gap-3">
+                        <Target size={18} className="text-blue-600" />
+                        <div className="flex-1">
+                          <p className="text-sm font-bold text-blue-900">Rattrapage éligible</p>
+                          <p className="text-xs text-blue-500">{fmtHours(workStatsData.rattrapageHoursNeeded)} à rattraper</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Comparison: real vs expected */}
@@ -390,7 +433,7 @@ export default function RH() {
                       <div className="text-center">
                         <p className="text-xs text-slate-400 uppercase font-medium">Retards</p>
                         <p className={`font-bold ${workStatsData.lateCount > 0 ? 'text-amber-600' : 'text-slate-700'}`}>{workStatsData.lateCount}</p>
-                        <p className="text-xs text-slate-400">{workStatsData.totalLateMinutes}min</p>
+                        <p className="text-xs text-slate-400">{workStatsData.lateHours}h · {workStatsData.latePenaltyPerHour} F/h</p>
                       </div>
                       <div className="text-center">
                         <p className="text-xs text-slate-400 uppercase font-medium">En cours / Absents</p>
@@ -399,6 +442,32 @@ export default function RH() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Extra services list */}
+                  {workStatsData.extraServices?.length > 0 && (
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="p-4 border-b border-slate-100 flex items-center gap-2">
+                        <Zap size={16} className="text-emerald-600" />
+                        <h3 className="font-bold text-slate-800">Services extra assignés</h3>
+                      </div>
+                      <div className="divide-y divide-slate-50">
+                        {workStatsData.extraServices.map((svc: any) => (
+                          <div key={svc.id} className="flex justify-between items-center px-4 py-3 hover:bg-slate-50">
+                            <div>
+                              <p className="text-sm font-medium text-slate-700">{svc.description ?? 'Service extra'}</p>
+                              <p className="text-xs text-slate-400">{new Date(svc.date).toLocaleDateString('fr-FR')} · {svc.hours}h{svc.assignedByName ? ` · ${svc.assignedByName}` : ''}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-emerald-600 text-sm">+{fmt(svc.amount)} F</span>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${svc.status === 'VALIDEE' ? 'bg-green-100 text-green-700' : svc.status === 'ANNULEE' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                                {svc.status === 'VALIDEE' ? 'Validé' : svc.status === 'ANNULEE' ? 'Annulé' : 'En attente'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Recent pointages */}
                   {workStatsData.recentPointages?.length > 0 && (
