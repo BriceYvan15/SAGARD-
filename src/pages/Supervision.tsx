@@ -3,7 +3,7 @@ import {
   Bell, AlertTriangle, ShieldCheck, FileText, Loader2, Plus, X, Save,
   AlertCircle, CheckCircle2, Clock, LayoutDashboard,
   ArrowRight, ChevronRight, User, Calendar,
-  Building2, MessageSquare, Star, Image as ImageIcon, Zap,
+  Building2, MessageSquare, Star, Image as ImageIcon, Zap, Search,
 } from 'lucide-react'
 import { useApi } from '../lib/useApi'
 import { getAlerts, getAlert, ALERT_TYPES, ALERT_SEVERITIES, ALERT_STATES, createAlert, acknowledgeAlert, resolveAlert, markFalseAlert, convertToIncident } from '../services/alerts.service'
@@ -780,70 +780,170 @@ function DetailDrawer({ id, onClose, onReload, type }: { id: string; onClose: ()
     } finally { setActing(false) }
   }
 
-  const titleMap = { alert: 'Détail de l\'alerte', incident: 'Détail de l\'incident', control: 'Détail de la visite', report: 'Détail du rapport' }
-  const accentMap = { alert: 'bg-red-500', incident: 'bg-amber-500', control: 'bg-blue-500', report: 'bg-green-500' }
+  const titleMap = { alert: 'Alerte SOS', incident: 'Incident', control: 'Visite de contrôle', report: 'Rapport quotidien' }
+  const subtitleMap = {
+    alert: () => `${ALERT_TYPES.find(t => t.value === item?.alertType)?.label ?? item?.alertType ?? '—'} · ${item?.site?.name ?? '—'}`,
+    incident: () => item?.title ?? '—',
+    control: () => `${CONTROL_VISIT_TYPES.find(t => t.value === item?.visitType)?.label ?? item?.visitType ?? '—'} · ${item?.site?.name ?? '—'}`,
+    report: () => `${REPORT_SHIFTS.find(s => s.value === item?.shift)?.label ?? item?.shift ?? '—'} · ${item?.site?.name ?? '—'}`,
+  }
+  const stateBadge = () => {
+    if (!item) return null
+    if (type === 'alert') return <Badge label={ALERT_STATES.find(s => s.value === item.state)?.label ?? item.state} color={ALERT_STATES.find(s => s.value === item.state)?.color ?? 'gray'} />
+    if (type === 'incident') return <Badge label={INCIDENT_STATES.find(s => s.value === item.state)?.label ?? item.state} color={INCIDENT_STATES.find(s => s.value === item.state)?.color ?? 'gray'} />
+    if (type === 'control') return <Badge label={CONTROL_VISIT_STATES.find(s => s.value === item.state)?.label ?? item.state} color={CONTROL_VISIT_STATES.find(s => s.value === item.state)?.color ?? 'gray'} />
+    if (type === 'report') return <Badge label={REPORT_STATES.find(s => s.value === item.state)?.label ?? item.state} color={REPORT_STATES.find(s => s.value === item.state)?.color ?? 'gray'} />
+    return null
+  }
 
   return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col animate-slide-in-right">
-        {/* Header */}
-        <div className={`flex items-center justify-between px-5 py-4 ${accentMap[type]} text-white`}>
-          <h3 className="text-base font-bold flex items-center gap-2">
-            {type === 'alert' && <Bell size={18} />}
-            {type === 'incident' && <AlertTriangle size={18} />}
-            {type === 'control' && <ShieldCheck size={18} />}
-            {type === 'report' && <FileText size={18} />}
-            {titleMap[type]}
-          </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-white/20"><X size={18} /></button>
-        </div>
+    <div className="fixed inset-0 z-50 flex">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative ml-auto h-full w-full overflow-y-auto bg-white shadow-2xl border-l border-slate-200 sm:max-w-md">
+        <button onClick={onClose}
+          className="absolute right-4 top-4 z-10 rounded-lg p-1.5 opacity-70 hover:opacity-100 hover:bg-slate-100 transition-opacity cursor-pointer">
+          <X size={18} className="text-slate-500" />
+        </button>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {loading ? <Spinner /> : !item ? <Empty text="Élément introuvable" /> : (
-            <>
-              {/* Reference + State */}
-              <div className="flex items-center justify-between gap-2">
+        {loading ? (
+          <div className="flex justify-center py-16"><Loader2 className="animate-spin text-slate-300" size={28} /></div>
+        ) : !item ? (
+          <div className="text-center py-12 text-slate-400 text-sm">Élément introuvable</div>
+        ) : (
+          <>
+            <div className="flex flex-col space-y-2 border-b border-slate-100 p-6 pt-8">
+              <h2 className="text-2xl font-normal text-slate-800">{titleMap[type]}</h2>
+              <p className="text-sm text-slate-400">{subtitleMap[type]()}</p>
+            </div>
+
+            <div className="space-y-6 p-6">
+              <div className="flex items-center justify-between">
                 <span className="text-xs font-mono text-slate-400">{item.reference}</span>
-                {type === 'alert' && <Badge label={ALERT_STATES.find(s => s.value === item.state)?.label ?? item.state} color={ALERT_STATES.find(s => s.value === item.state)?.color ?? 'gray'} />}
-                {type === 'incident' && <Badge label={INCIDENT_STATES.find(s => s.value === item.state)?.label ?? item.state} color={INCIDENT_STATES.find(s => s.value === item.state)?.color ?? 'gray'} />}
-                {type === 'control' && <Badge label={CONTROL_VISIT_STATES.find(s => s.value === item.state)?.label ?? item.state} color={CONTROL_VISIT_STATES.find(s => s.value === item.state)?.color ?? 'gray'} />}
-                {type === 'report' && <Badge label={REPORT_STATES.find(s => s.value === item.state)?.label ?? item.state} color={REPORT_STATES.find(s => s.value === item.state)?.color ?? 'gray'} />}
+                {stateBadge()}
               </div>
 
-              {/* Site */}
-              <DetailRow icon={<Building2 size={14} />} label="Site" value={item.site?.name ?? '—'} />
+              {/* Info cards grid */}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-lg border border-slate-200 p-3">
+                  <p className="flex items-center gap-1.5 text-xs text-slate-400"><Building2 size={12} /> Site</p>
+                  <p className="mt-1 truncate text-sm text-slate-700">{item.site?.name ?? '—'}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 p-3">
+                  <p className="flex items-center gap-1.5 text-xs text-slate-400"><Calendar size={12} /> Créé le</p>
+                  <p className="mt-1 truncate text-sm text-slate-700">{new Date(item.createdAt).toLocaleDateString('fr-FR')}</p>
+                </div>
+                {type === 'alert' && (<>
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <p className="flex items-center gap-1.5 text-xs text-slate-400"><Zap size={12} /> Sévérité</p>
+                    <p className="mt-1 truncate text-sm text-slate-700">{ALERT_SEVERITIES.find(s => s.value === item.severity)?.label ?? item.severity}</p>
+                  </div>
+                  {item.responseTimeMin > 0 && <div className="rounded-lg border border-slate-200 p-3">
+                    <p className="flex items-center gap-1.5 text-xs text-slate-400"><Clock size={12} /> Réponse</p>
+                    <p className="mt-1 truncate text-sm text-slate-700">{item.responseTimeMin.toFixed(1)} min</p>
+                  </div>}
+                </>)}
+                {type === 'incident' && (<>
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <p className="flex items-center gap-1.5 text-xs text-slate-400"><Zap size={12} /> Gravité</p>
+                    <p className="mt-1 truncate text-sm text-slate-700">{INCIDENT_SEVERITIES.find(s => s.value === item.severity)?.label ?? item.severity}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <p className="flex items-center gap-1.5 text-xs text-slate-400"><Calendar size={12} /> Date/heure</p>
+                    <p className="mt-1 truncate text-sm text-slate-700">{new Date(item.incidentDatetime).toLocaleDateString('fr-FR')}</p>
+                  </div>
+                </>)}
+                {type === 'control' && (<>
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <p className="flex items-center gap-1.5 text-xs text-slate-400"><Clock size={12} /> Durée</p>
+                    <p className="mt-1 truncate text-sm text-slate-700">{item.durationMinutes != null ? `${item.durationMinutes} min` : '—'}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <p className="flex items-center gap-1.5 text-xs text-slate-400"><User size={12} /> Agents</p>
+                    <p className="mt-1 truncate text-sm text-slate-700">{item.agentsChecked ?? 0}/{item.agentsExpected ?? 0} contrôlés</p>
+                  </div>
+                </>)}
+                {type === 'report' && (<>
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <p className="flex items-center gap-1.5 text-xs text-slate-400"><Clock size={12} /> Vacation</p>
+                    <p className="mt-1 truncate text-sm text-slate-700">{REPORT_SHIFTS.find(s => s.value === item.shift)?.label ?? item.shift}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <p className="flex items-center gap-1.5 text-xs text-slate-400"><User size={12} /> Agents</p>
+                    <p className="mt-1 truncate text-sm text-slate-700">{item._count?.agents ?? item.agentCount ?? 0}/{item.agentsExpected ?? 0}</p>
+                  </div>
+                </>)}
+              </div>
 
-              {/* Type-specific fields */}
-              {type === 'alert' && <AlertDetails item={item} />}
-              {type === 'incident' && <IncidentDetails item={item} />}
-              {type === 'control' && <ControlDetails item={item} />}
-              {type === 'report' && <ReportDetails item={item} />}
-
-              {/* Agent/Controller/Reporter info */}
-              {(item.agent || item.controller || item.reporter || item.submitter || item.createdBy) && (
-                <div className="bg-slate-50 rounded-xl p-3 space-y-2">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5"><User size={12} /> Personnes</p>
-                  {item.agent && <DetailRow icon={<User size={12} />} label="Agent" value={`${item.agent.user?.firstName ?? ''} ${item.agent.user?.lastName ?? ''}`.trim() || item.agent.matricule || '—'} />}
-                  {item.controller && <DetailRow icon={<ShieldCheck size={12} />} label="Contrôleur" value={`${item.controller.firstName ?? ''} ${item.controller.lastName ?? ''}`.trim() || '—'} />}
-                  {item.reporter && <DetailRow icon={<User size={12} />} label="Signalé par" value={`${item.reporter.firstName ?? ''} ${item.reporter.lastName ?? ''}`.trim() || '—'} />}
-                  {item.submitter && <DetailRow icon={<User size={12} />} label="Soumis par" value={`${item.submitter.firstName ?? ''} ${item.submitter.lastName ?? ''}`.trim() || '—'} />}
-                  {item.createdBy && <DetailRow icon={<User size={12} />} label="Créé par" value={`${item.createdBy.firstName ?? ''} ${item.createdBy.lastName ?? ''}`.trim() || '—'} />}
+              {/* Type-specific details in bordered cards */}
+              {type === 'alert' && item.message && (
+                <div className="rounded-xl border border-slate-200">
+                  <p className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-700">Message</p>
+                  <div className="p-4 text-sm text-slate-700">{item.message}</div>
+                </div>
+              )}
+              {type === 'incident' && item.description && (
+                <div className="rounded-xl border border-slate-200">
+                  <p className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-700">Description</p>
+                  <div className="p-4 text-sm text-slate-700">{item.description}</div>
+                </div>
+              )}
+              {type === 'incident' && item.resolution && (
+                <div className="rounded-xl border border-green-200 bg-green-50/50">
+                  <p className="border-b border-green-100 px-4 py-3 text-sm font-medium text-green-700 flex items-center gap-1.5"><CheckCircle2 size={14} /> Résolution</p>
+                  <div className="p-4 text-sm text-slate-700">{item.resolution}</div>
+                </div>
+              )}
+              {type === 'control' && (
+                <div className="rounded-xl border border-slate-200">
+                  <p className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-700">Contrôles</p>
+                  <div className="space-y-2 p-4">
+                    <ChecklistRow label="Tenue réglementaire" ok={item.uniformOk} />
+                    <ChecklistRow label="Équipement" ok={item.equipmentOk} />
+                    <ChecklistRow label="Posture / vigilance" ok={item.postureOk} />
+                    <ChecklistRow label="Registre à jour" ok={item.registerOk} />
+                  </div>
+                </div>
+              )}
+              {type === 'control' && item.notes && (
+                <div className="rounded-xl border border-slate-200">
+                  <p className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-700">Notes</p>
+                  <div className="p-4 text-sm text-slate-700">{item.notes}</div>
+                </div>
+              )}
+              {type === 'report' && item.summary && (
+                <div className="rounded-xl border border-slate-200">
+                  <p className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-700">Résumé</p>
+                  <div className="p-4 text-sm text-slate-700">{item.summary}</div>
                 </div>
               )}
 
-              {/* Agents list (incidents & reports) */}
+              {/* People info */}
+              {(item.agent || item.controller || item.reporter || item.submitter || item.createdBy) && (
+                <div className="rounded-xl border border-slate-200">
+                  <p className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-700">Personnes</p>
+                  <div className="space-y-2 p-4 text-sm">
+                    {item.agent && <div className="flex items-center justify-between"><span className="text-slate-400">Agent</span><span className="text-slate-700">{`${item.agent.user?.firstName ?? ''} ${item.agent.user?.lastName ?? ''}`.trim() || item.agent.matricule || '—'}</span></div>}
+                    {item.controller && <div className="flex items-center justify-between"><span className="text-slate-400">Contrôleur</span><span className="text-slate-700">{`${item.controller.firstName ?? ''} ${item.controller.lastName ?? ''}`.trim() || '—'}</span></div>}
+                    {item.reporter && <div className="flex items-center justify-between"><span className="text-slate-400">Signalé par</span><span className="text-slate-700">{`${item.reporter.firstName ?? ''} ${item.reporter.lastName ?? ''}`.trim() || '—'}</span></div>}
+                    {item.submitter && <div className="flex items-center justify-between"><span className="text-slate-400">Soumis par</span><span className="text-slate-700">{`${item.submitter.firstName ?? ''} ${item.submitter.lastName ?? ''}`.trim() || '—'}</span></div>}
+                    {item.createdBy && <div className="flex items-center justify-between"><span className="text-slate-400">Créé par</span><span className="text-slate-700">{`${item.createdBy.firstName ?? ''} ${item.createdBy.lastName ?? ''}`.trim() || '—'}</span></div>}
+                  </div>
+                </div>
+              )}
+
+              {/* Agents list */}
               {item.agents && item.agents.length > 0 && (
-                <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5"><User size={12} /> Agents ({item.agents.length})</p>
-                  {item.agents.map((ag: any) => (
-                    <div key={ag.id} className="flex items-center gap-2 text-xs text-slate-700">
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                      {ag.agent?.user ? `${ag.agent.user.firstName} ${ag.agent.user.lastName}` : ag.agent?.matricule ?? 'Agent'}
-                      {ag.role && <span className="text-slate-400">· {ag.role}</span>}
-                    </div>
-                  ))}
+                <div className="rounded-xl border border-slate-200">
+                  <p className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-700">Agents ({item.agents.length})</p>
+                  <div className="space-y-1.5 p-4">
+                    {item.agents.map((ag: any) => (
+                      <div key={ag.id} className="flex items-center gap-2 text-sm text-slate-700">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                        {ag.agent?.user ? `${ag.agent.user.firstName} ${ag.agent.user.lastName}` : ag.agent?.matricule ?? 'Agent'}
+                        {ag.role && <span className="text-slate-400">· {ag.role}</span>}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -862,9 +962,9 @@ function DetailDrawer({ id, onClose, onReload, type }: { id: string; onClose: ()
                 const origin = baseUrl || window.location.origin
                 const fullUrl = (u: string) => u.startsWith('http') ? u : `${origin}${u}`
                 return (
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5"><ImageIcon size={12} /> Photos ({urls.length})</p>
-                    <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-slate-200">
+                    <p className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-700 flex items-center gap-1.5"><ImageIcon size={14} /> Photos ({urls.length})</p>
+                    <div className="grid grid-cols-2 gap-2 p-4">
                       {urls.map((u: string, i: number) => (
                         <a key={i} href={fullUrl(u)} target="_blank" rel="noopener noreferrer" className="block rounded-lg overflow-hidden border border-slate-200 hover:opacity-80">
                           <img src={fullUrl(u)} alt={`Photo ${i + 1}`} className="w-full h-24 object-cover" />
@@ -875,11 +975,11 @@ function DetailDrawer({ id, onClose, onReload, type }: { id: string; onClose: ()
                 )
               })()}
 
-              {/* Rapport d'incident (chef des opérations) — only for incidents */}
+              {/* Rapport d'incident (chef des opérations) */}
               {type === 'incident' && (
-                <div className="bg-slate-50 rounded-xl p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5"><FileText size={12} /> Rapport d'incident</p>
+                <div className="rounded-xl border border-slate-200">
+                  <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                    <p className="text-sm font-medium text-slate-700 flex items-center gap-1.5"><FileText size={14} /> Rapport d'incident</p>
                     {item.opsReportState && (
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                         item.opsReportState === 'VALIDE' ? 'bg-green-100 text-green-700' :
@@ -891,154 +991,106 @@ function DetailDrawer({ id, onClose, onReload, type }: { id: string; onClose: ()
                       </span>
                     )}
                   </div>
-
-                  {/* Existing report text */}
-                  {item.opsReport && !showOpsEditor && (
-                    <div className="text-xs text-slate-700 bg-white rounded-lg p-2.5 border border-slate-200 whitespace-pre-wrap">{item.opsReport}</div>
-                  )}
-
-                  {/* Reporter info */}
-                  {item.opsReportBy && (
-                    <p className="text-xs text-slate-400">
-                      Rédigé par {item.opsReportBy.firstName} {item.opsReportBy.lastName}
-                      {item.opsReportDate && ` · ${new Date(item.opsReportDate).toLocaleString('fr-FR')}`}
-                    </p>
-                  )}
-
-                  {/* Validator info */}
-                  {item.opsReportValidatedBy && (
-                    <p className="text-xs text-slate-400">
-                      {item.opsReportState === 'VALIDE' ? 'Validé' : 'Rejeté'} par {item.opsReportValidatedBy.firstName} {item.opsReportValidatedBy.lastName}
-                      {item.opsReportValidatedAt && ` · ${new Date(item.opsReportValidatedAt).toLocaleString('fr-FR')}`}
-                    </p>
-                  )}
-
-                  {/* Chef ops: editor */}
-                  {isChefOps && (showOpsEditor || (!item.opsReport && item.opsReportState !== 'SOUMIS')) && (
-                    <div className="space-y-2">
-                      <textarea
-                        value={opsReportText}
-                        onChange={e => setOpsReportText(e.target.value)}
-                        rows={5}
-                        placeholder="Rédigez le rapport d'incident..."
-                        className="w-full text-xs border border-slate-200 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 resize-none"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => doOpsAction('submit')}
-                          disabled={acting || !opsReportText.trim()}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {acting ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Soumettre au DG
-                        </button>
-                        {item.opsReport && (
-                          <button onClick={() => setShowOpsEditor(false)} className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700">Annuler</button>
-                        )}
+                  <div className="space-y-2 p-4">
+                    {item.opsReport && !showOpsEditor && (
+                      <div className="text-sm text-slate-700 bg-slate-50 rounded-lg p-2.5 border border-slate-200 whitespace-pre-wrap">{item.opsReport}</div>
+                    )}
+                    {item.opsReportBy && (
+                      <p className="text-xs text-slate-400">Rédigé par {item.opsReportBy.firstName} {item.opsReportBy.lastName}{item.opsReportDate && ` · ${new Date(item.opsReportDate).toLocaleString('fr-FR')}`}</p>
+                    )}
+                    {item.opsReportValidatedBy && (
+                      <p className="text-xs text-slate-400">{item.opsReportState === 'VALIDE' ? 'Validé' : 'Rejeté'} par {item.opsReportValidatedBy.firstName} {item.opsReportValidatedBy.lastName}{item.opsReportValidatedAt && ` · ${new Date(item.opsReportValidatedAt).toLocaleString('fr-FR')}`}</p>
+                    )}
+                    {isChefOps && (showOpsEditor || (!item.opsReport && item.opsReportState !== 'SOUMIS')) && (
+                      <div className="space-y-2">
+                        <textarea value={opsReportText} onChange={e => setOpsReportText(e.target.value)} rows={5} placeholder="Rédigez le rapport d'incident..."
+                          className="w-full text-xs border border-slate-200 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 resize-none" />
+                        <div className="flex gap-2">
+                          <button onClick={() => doOpsAction('submit')} disabled={acting || !opsReportText.trim()}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 disabled:opacity-50">
+                            {acting ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Soumettre au DG
+                          </button>
+                          {item.opsReport && <button onClick={() => setShowOpsEditor(false)} className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700">Annuler</button>}
+                        </div>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Chef ops: edit button when report exists */}
-                  {isChefOps && item.opsReport && !showOpsEditor && item.opsReportState !== 'SOUMIS' && (
-                    <button onClick={() => { setOpsReportText(item.opsReport ?? ''); setShowOpsEditor(true) }} className="text-xs text-blue-600 hover:underline">Modifier le rapport</button>
-                  )}
-
-                  {/* DG: validate/reject when SOUMIS */}
-                  {isDG && item.opsReportState === 'SOUMIS' && !showRejectBox && (
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        onClick={() => doOpsAction('validate')}
-                        disabled={acting}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 disabled:opacity-50"
-                      >
-                        {acting ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Valider
-                      </button>
-                      <button
-                        onClick={() => setShowRejectBox(true)}
-                        disabled={acting}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200 disabled:opacity-50"
-                      >
-                        <X size={12} /> Rejeter
-                      </button>
-                    </div>
-                  )}
-
-                  {/* DG: reject reason box */}
-                  {isDG && showRejectBox && (
-                    <div className="space-y-2">
-                      <textarea
-                        value={rejectReason}
-                        onChange={e => setRejectReason(e.target.value)}
-                        rows={2}
-                        placeholder="Motif du rejet (optionnel)..."
-                        className="w-full text-xs border border-slate-200 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-red-200 resize-none"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => doOpsAction('reject')}
-                          disabled={acting}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 disabled:opacity-50"
-                        >
-                          {acting ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />} Confirmer le rejet
+                    )}
+                    {isChefOps && item.opsReport && !showOpsEditor && item.opsReportState !== 'SOUMIS' && (
+                      <button onClick={() => { setOpsReportText(item.opsReport ?? ''); setShowOpsEditor(true) }} className="text-xs text-blue-600 hover:underline">Modifier le rapport</button>
+                    )}
+                    {isDG && item.opsReportState === 'SOUMIS' && !showRejectBox && (
+                      <div className="flex gap-2 pt-1">
+                        <button onClick={() => doOpsAction('validate')} disabled={acting}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 disabled:opacity-50">
+                          {acting ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Valider
                         </button>
-                        <button onClick={() => setShowRejectBox(false)} className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700">Annuler</button>
+                        <button onClick={() => setShowRejectBox(true)} disabled={acting}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200 disabled:opacity-50">
+                          <X size={12} /> Rejeter
+                        </button>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Chef ops: resubmit after rejection */}
-                  {isChefOps && item.opsReportState === 'REJETE' && !showOpsEditor && (
-                    <button onClick={() => { setOpsReportText(item.opsReport ?? ''); setShowOpsEditor(true) }} className="text-xs text-blue-600 hover:underline">Reprendre le rapport</button>
-                  )}
+                    )}
+                    {isDG && showRejectBox && (
+                      <div className="space-y-2">
+                        <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={2} placeholder="Motif du rejet (optionnel)..."
+                          className="w-full text-xs border border-slate-200 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-red-200 resize-none" />
+                        <div className="flex gap-2">
+                          <button onClick={() => doOpsAction('reject')} disabled={acting}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 disabled:opacity-50">
+                            {acting ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />} Confirmer le rejet
+                          </button>
+                          <button onClick={() => setShowRejectBox(false)} className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700">Annuler</button>
+                        </div>
+                      </div>
+                    )}
+                    {isChefOps && item.opsReportState === 'REJETE' && !showOpsEditor && (
+                      <button onClick={() => { setOpsReportText(item.opsReport ?? ''); setShowOpsEditor(true) }} className="text-xs text-blue-600 hover:underline">Reprendre le rapport</button>
+                    )}
+                  </div>
                 </div>
               )}
 
               {/* Timestamps */}
-              <div className="border-t border-slate-100 pt-3 space-y-1">
-                <DetailRow icon={<Calendar size={12} />} label="Créé le" value={new Date(item.createdAt).toLocaleString('fr-FR')} />
-                {item.updatedAt && item.updatedAt !== item.createdAt && <DetailRow icon={<Calendar size={12} />} label="Modifié le" value={new Date(item.updatedAt).toLocaleString('fr-FR')} />}
-              </div>
-            </>
-          )}
-        </div>
+              {item.updatedAt && item.updatedAt !== item.createdAt && (
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 text-sm">
+                  <span className="text-slate-400">Modifié le</span>
+                  <span className="text-slate-700">{new Date(item.updatedAt).toLocaleString('fr-FR')}</span>
+                </div>
+              )}
 
-        {/* Actions footer */}
-        {!loading && item && (
-          <div className="border-t border-slate-100 p-4 flex flex-wrap gap-2 bg-slate-50">
-            {type === 'alert' && (
-              <>
-                {item.state === 'NOUVELLE' && <ActionBtn label="Prendre en compte" onClick={() => doAction('ack')} cls="bg-amber-100 text-amber-700" loading={acting} />}
-                {(item.state === 'PRISE_EN_COMPTE' || item.state === 'INTERVENTION') && <ActionBtn label="Résoudre" onClick={() => doAction('resolve')} cls="bg-green-100 text-green-700" loading={acting} />}
-                {item.state !== 'RESOLUE' && item.state !== 'FAUSSE' && <ActionBtn label="Fausse alerte" onClick={() => doAction('false')} cls="bg-slate-100 text-slate-600" loading={acting} />}
-                {!item.incidentId && item.state !== 'FAUSSE' && <ActionBtn label="→ Incident" onClick={() => doAction('convert')} cls="bg-red-100 text-red-700" loading={acting} />}
-              </>
-            )}
-            {type === 'incident' && (
-              <>
-                {item.state === 'OUVERT' && <ActionBtn label="Investiguer" onClick={() => doAction('investigate')} cls="bg-amber-100 text-amber-700" loading={acting} />}
-                {item.state === 'INVESTIGATION' && <ActionBtn label="Résoudre" onClick={() => doAction('resolve')} cls="bg-green-100 text-green-700" loading={acting} />}
-                {item.state === 'RESOLU' && <ActionBtn label="Clore" onClick={() => doAction('close')} cls="bg-slate-100 text-slate-600" loading={acting} />}
-              </>
-            )}
-            {type === 'control' && (
-              <>
-                {item.state === 'BROUILLON' && <ActionBtn label="Marquer terminée" onClick={() => doAction('done')} cls="bg-green-100 text-green-700" loading={acting} />}
-                {item.state === 'BROUILLON' && <ActionBtn label="Reporter" onClick={() => doAction('reported')} cls="bg-amber-100 text-amber-700" loading={acting} />}
-                {item.state !== 'ANNULEE' && item.state !== 'TERMINEE' && <ActionBtn label="Annuler" onClick={() => doAction('cancel')} cls="bg-slate-100 text-slate-600" loading={acting} />}
-              </>
-            )}
-            {type === 'report' && (
-              <>
-                {item.state === 'BROUILLON' && <ActionBtn label="Soumettre" onClick={() => doAction('submit')} cls="bg-blue-100 text-blue-700" loading={acting} />}
-                {item.state === 'SOUMIS' && <ActionBtn label="Valider" onClick={() => doAction('validate')} cls="bg-green-100 text-green-700" loading={acting} />}
-                {item.state === 'SOUMIS' && <ActionBtn label="Rejeter" onClick={() => doAction('reject')} cls="bg-red-100 text-red-700" loading={acting} />}
-                {(item.state === 'REJETE' || item.state === 'VALIDE') && <ActionBtn label="Remettre brouillon" onClick={() => doAction('reset')} cls="bg-slate-100 text-slate-600" loading={acting} />}
-              </>
-            )}
-          </div>
+              {/* Action buttons */}
+              <div className="space-y-2">
+                {type === 'alert' && (<>
+                  {item.state === 'NOUVELLE' && <button onClick={() => doAction('ack')} disabled={acting} className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-60">{acting ? <Loader2 size={16} className="animate-spin" /> : <Bell size={16} />} Prendre en compte</button>}
+                  {(item.state === 'PRISE_EN_COMPTE' || item.state === 'INTERVENTION') && <button onClick={() => doAction('resolve')} disabled={acting} className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-60">{acting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Résoudre</button>}
+                  {item.state !== 'RESOLUE' && item.state !== 'FAUSSE' && <button onClick={() => doAction('false')} disabled={acting} className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60">{acting ? <Loader2 size={16} className="animate-spin" /> : null} Fausse alerte</button>}
+                  {!item.incidentId && item.state !== 'FAUSSE' && <button onClick={() => doAction('convert')} disabled={acting} className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60">{acting ? <Loader2 size={16} className="animate-spin" /> : <AlertTriangle size={16} />} Convertir en incident</button>}
+                </>)}
+                {type === 'incident' && (<>
+                  {item.state === 'OUVERT' && <button onClick={() => doAction('investigate')} disabled={acting} className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-60">{acting ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />} Investiguer</button>}
+                  {item.state === 'INVESTIGATION' && <button onClick={() => doAction('resolve')} disabled={acting} className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-60">{acting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Résoudre</button>}
+                  {item.state === 'RESOLU' && <button onClick={() => doAction('close')} disabled={acting} className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60">{acting ? <Loader2 size={16} className="animate-spin" /> : null} Clore l'incident</button>}
+                </>)}
+                {type === 'control' && (<>
+                  {item.state === 'BROUILLON' && <>
+                    <button onClick={() => doAction('done')} disabled={acting} className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-60">{acting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Marquer terminée</button>
+                    <button onClick={() => doAction('reported')} disabled={acting} className="flex w-full items-center justify-center gap-2 rounded-lg border border-amber-200 px-4 py-2.5 text-sm font-medium text-amber-600 transition-colors hover:bg-amber-50 disabled:opacity-60">{acting ? <Loader2 size={16} className="animate-spin" /> : <Clock size={16} />} Reporter</button>
+                  </>}
+                  {item.state !== 'ANNULEE' && item.state !== 'TERMINEE' && <button onClick={() => doAction('cancel')} disabled={acting} className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60">{acting ? <Loader2 size={16} className="animate-spin" /> : null} Annuler la visite</button>}
+                </>)}
+                {type === 'report' && (<>
+                  {item.state === 'BROUILLON' && <button onClick={() => doAction('submit')} disabled={acting} className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-60">{acting ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />} Soumettre</button>}
+                  {item.state === 'SOUMIS' && <>
+                    <button onClick={() => doAction('validate')} disabled={acting} className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-60">{acting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Valider</button>
+                    <button onClick={() => doAction('reject')} disabled={acting} className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60">{acting ? <Loader2 size={16} className="animate-spin" /> : <X size={16} />} Rejeter</button>
+                  </>}
+                  {(item.state === 'REJETE' || item.state === 'VALIDE') && <button onClick={() => doAction('reset')} disabled={acting} className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60">{acting ? <Loader2 size={16} className="animate-spin" /> : null} Remettre en brouillon</button>}
+                </>)}
+              </div>
+            </div>
+          </>
         )}
       </div>
-    </>
+    </div>
   )
 }
 

@@ -643,7 +643,7 @@ export default function RH() {
                           <th className="hidden px-6 py-3 font-medium sm:table-cell text-right">Brut</th>
                           <th className="px-6 py-3 font-medium text-right">Net</th>
                           <th className="hidden px-6 py-3 font-medium sm:table-cell">Statut</th>
-                          <th className="px-6 py-3 font-medium text-right">Actions</th>
+                          <th className="px-6 py-3 font-medium text-center">Détails</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
@@ -681,51 +681,11 @@ export default function RH() {
                               <td className="hidden px-6 py-4 sm:table-cell">
                                 <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${lst.cls}`}>{lst.label}</span>
                               </td>
-                              <td className="px-6 py-4" onClick={e => e.stopPropagation()}>
-                                <div className="flex items-center justify-end gap-1">
-                                  {l.paymentStatus === 'BROUILLON' && (
-                                    <>
-                                      <button onClick={() => openEditLine(l)} title="Modifier"
-                                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-                                        <Pencil size={14} />
-                                      </button>
-                                      <button onClick={() => { setBlockLine(l); setBlockReason(l.blockReason ?? '') }} title="Bloquer"
-                                        className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors">
-                                        <ShieldOff size={14} />
-                                      </button>
-                                      <button onClick={() => handleValidateLine(l.id)} disabled={actionLoading === l.id} title="Valider"
-                                        className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors">
-                                        {actionLoading === l.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                                      </button>
-                                    </>
-                                  )}
-                                  {l.paymentStatus === 'VALIDE' && (
-                                    <>
-                                      <button onClick={() => openEditLine(l)} title="Modifier"
-                                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors">
-                                        <Pencil size={14} />
-                                      </button>
-                                      <button onClick={() => { setBlockLine(l); setBlockReason(l.blockReason ?? '') }} title="Bloquer"
-                                        className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors">
-                                        <ShieldOff size={14} />
-                                      </button>
-                                      <button onClick={() => { setPayLineData(l); setPayForm({ treasuryAccountId: '', paymentMethod: 'VIREMENT_BANCAIRE', reference: '' }) }} title="Payer"
-                                        className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors">
-                                        <DollarSign size={14} />
-                                      </button>
-                                    </>
-                                  )}
-                                  {l.paymentStatus === 'BLOQUE' && (
-                                    <button onClick={() => { setBlockLine(l); setBlockReason(l.blockReason ?? '') }} title="Débloquer"
-                                      className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors">
-                                      <ShieldCheck size={14} />
-                                    </button>
-                                  )}
-                                  <button onClick={async () => { setPayslipLoading(true); try { const data = await getPayslip(l.id); setPayslipData(data) } catch { alert('Erreur chargement fiche') } finally { setPayslipLoading(false) } }}
-                                    className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 transition-colors" title="Voir fiche">
-                                    <Eye size={14} />
-                                  </button>
-                                </div>
+                              <td className="px-6 py-4 text-center" onClick={e => e.stopPropagation()}>
+                                <button onClick={() => setSelectedLine(l)}
+                                  className="inline-flex items-center justify-center rounded-lg p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                                  <ChevronRight size={18} />
+                                </button>
                               </td>
                             </tr>
                           )
