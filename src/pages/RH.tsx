@@ -1,8 +1,8 @@
 import { Fragment, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Users, DollarSign, Calendar, AlertTriangle, CheckCircle, Clock, Loader2, Plus, X, Award, UserPlus, FileText, Eye, Briefcase, Ban, Pencil, ShieldOff, ShieldCheck, Search, Trash2 } from 'lucide-react'
+import { Users, DollarSign, Calendar, AlertTriangle, CheckCircle, Clock, Loader2, Plus, X, Award, UserPlus, FileText, Eye, Briefcase, Ban, Pencil, ShieldOff, ShieldCheck, Search, Trash2, TrendingUp, Timer, Target } from 'lucide-react'
 import { useApi } from '../lib/useApi'
-import { getPayrolls, createPayrollMonth, validatePayrollLine, payPayrollLine, deletePayroll, getPayslip, getPayrollDetail, updatePayrollLine, toggleBlockPayrollLine, getLeaves, createLeave, approveLeave, rejectLeave, getTrainings, createTraining, getCandidacies, createCandidacy, updateIntegrationStep, getContractExpiryAlerts, getIndisciplinedAgents, getDisciplinary, createDisciplinary, getContracts } from '../services/hr.service'
+import { getPayrolls, createPayrollMonth, validatePayrollLine, payPayrollLine, deletePayroll, getPayslip, getPayrollDetail, updatePayrollLine, toggleBlockPayrollLine, getLeaves, createLeave, approveLeave, rejectLeave, getTrainings, createTraining, getCandidacies, createCandidacy, updateIntegrationStep, getContractExpiryAlerts, getIndisciplinedAgents, getDisciplinary, createDisciplinary, getContracts, getWorkStats } from '../services/hr.service'
 import { getTreasuryAccounts } from '../services/treasury.service'
 import { getAgents } from '../services/agents.service'
 import { fmt, fmtDate } from '../lib/utils'
@@ -94,6 +94,22 @@ export default function RH() {
   // Delete payroll modal
   const [deletePayrollItem, setDeletePayrollItem] = useState<any | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  // Work stats sub-tab
+  const [payrollSubTab, setPayrollSubTab] = useState<'payroll' | 'workStats'>('payroll')
+  const [workStatsAgent, setWorkStatsAgent] = useState('')
+  const [workStatsData, setWorkStatsData] = useState<any | null>(null)
+  const [workStatsLoading, setWorkStatsLoading] = useState(false)
+
+  async function loadWorkStats(agentId: string) {
+    if (!agentId) { setWorkStatsData(null); return }
+    setWorkStatsLoading(true)
+    try {
+      const data = await getWorkStats(agentId)
+      setWorkStatsData(data)
+    } catch { setWorkStatsData(null) }
+    finally { setWorkStatsLoading(false) }
+  }
+
   // Create month modal
   const [showCreateMonthModal, setShowCreateMonthModal] = useState(false)
   const [createMonthForm, setCreateMonthForm] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear() })
@@ -263,6 +279,169 @@ export default function RH() {
       {/* PAIE */}
       {tab === 'payroll' && (
         <div className="space-y-4">
+          {/* Sub-tabs */}
+          <div className="flex gap-2">
+            <button onClick={() => setPayrollSubTab('payroll')}
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${payrollSubTab === 'payroll' ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>
+              <DollarSign size={15} /> Paie
+            </button>
+            <button onClick={() => setPayrollSubTab('workStats')}
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${payrollSubTab === 'workStats' ? 'bg-slate-800 text-white' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>
+              <Timer size={15} /> Suivi temps réel
+            </button>
+          </div>
+
+          {/* ─── SOUS-TAB: SUIVI TEMPS RÉEL ─── */}
+          {payrollSubTab === 'workStats' && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                  <label className="text-sm font-medium text-slate-600 whitespace-nowrap">Sélectionner un agent :</label>
+                  <Select
+                    value={workStatsAgent}
+                    onChange={v => { setWorkStatsAgent(v); loadWorkStats(v) }}
+                    className="flex-1 sm:w-80"
+                    placeholder="— Choisir un agent —"
+                    options={agents.filter(a => a.status === 'EN_POSTE').map((a: any) => ({
+                      value: a.id,
+                      label: `${a.user?.firstName ?? ''} ${a.user?.lastName ?? ''} (${a.matricule})`,
+                    }))}
+                  />
+                </div>
+              </div>
+
+              {workStatsLoading ? (
+                <div className="flex justify-center py-12"><Loader2 className="animate-spin text-slate-400" /></div>
+              ) : workStatsData ? (
+                <div className="space-y-4">
+                  {/* Stats cards */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                      <div className="flex items-center gap-2 text-slate-400 mb-1">
+                        <Clock size={14} /><span className="text-xs font-medium uppercase">Heures travaillées</span>
+                      </div>
+                      <p className="text-2xl font-black text-slate-800">{fmtHours(workStatsData.hoursWorked)}</p>
+                      <p className="text-xs text-slate-400 mt-1">Objectif: {fmtHours(workStatsData.expectedHours)}</p>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                      <div className="flex items-center gap-2 text-slate-400 mb-1">
+                        <Calendar size={14} /><span className="text-xs font-medium uppercase">Jours travaillés</span>
+                      </div>
+                      <p className="text-2xl font-black text-slate-800">{workStatsData.daysWorked}<span className="text-sm text-slate-400 font-normal"> / {workStatsData.expectedDays}j</span></p>
+                      <p className="text-xs text-slate-400 mt-1">Sur {workStatsData.daysInMonth} jours</p>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                      <div className="flex items-center gap-2 text-slate-400 mb-1">
+                        <Target size={14} /><span className="text-xs font-medium uppercase">Taux de présence</span>
+                      </div>
+                      <p className={`text-2xl font-black ${workStatsData.attendanceRate >= 80 ? 'text-green-600' : workStatsData.attendanceRate >= 50 ? 'text-amber-600' : 'text-red-600'}`}>{workStatsData.attendanceRate}%</p>
+                      <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${workStatsData.attendanceRate >= 80 ? 'bg-green-500' : workStatsData.attendanceRate >= 50 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.min(workStatsData.attendanceRate, 100)}%` }} />
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                      <div className="flex items-center gap-2 text-slate-400 mb-1">
+                        <DollarSign size={14} /><span className="text-xs font-medium uppercase">Gains estimés</span>
+                      </div>
+                      <p className="text-2xl font-black text-sagard-yellow-dark">{fmt(workStatsData.estimatedEarnings)} <span className="text-sm font-normal">F</span></p>
+                      <p className="text-xs text-slate-400 mt-1">{workStatsData.daysWorked} vacations × 2500 F</p>
+                    </div>
+                  </div>
+
+                  {/* Comparison: real vs expected */}
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><TrendingUp size={16} /> Comparaison temps réel / objectif</h3>
+                    <div className="space-y-4">
+                      {/* Hours bar */}
+                      <div>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-slate-600 font-medium">Heures</span>
+                          <span className="text-slate-800 font-bold">{fmtHours(workStatsData.hoursWorked)} / {fmtHours(workStatsData.expectedHours)}</span>
+                        </div>
+                        <div className="h-3 bg-slate-100 rounded-full overflow-hidden relative">
+                          <div className="h-full bg-gradient-to-r from-sagard-yellow to-amber-500 rounded-full transition-all" style={{ width: `${Math.min(workStatsData.fillRate, 100)}%` }} />
+                          <div className="absolute top-0 right-0 h-full w-0.5 bg-slate-400" />
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">{workStatsData.fillRate}% du temps attendu</p>
+                      </div>
+                      {/* Days bar */}
+                      <div>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-slate-600 font-medium">Jours</span>
+                          <span className="text-slate-800 font-bold">{workStatsData.daysWorked} / {workStatsData.expectedDays} jours</span>
+                        </div>
+                        <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all" style={{ width: `${Math.min(workStatsData.attendanceRate, 100)}%` }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Extra info */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-slate-100">
+                      <div className="text-center">
+                        <p className="text-xs text-slate-400 uppercase font-medium">Shift</p>
+                        <p className="font-bold text-slate-700">{workStatsData.shift}</p>
+                        <p className="text-xs text-slate-400">{workStatsData.hoursPerDay}h/jour</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-slate-400 uppercase font-medium">Heures supp.</p>
+                        <p className="font-bold text-emerald-600">{fmtHours(workStatsData.overtimeHours)}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-slate-400 uppercase font-medium">Retards</p>
+                        <p className={`font-bold ${workStatsData.lateCount > 0 ? 'text-amber-600' : 'text-slate-700'}`}>{workStatsData.lateCount}</p>
+                        <p className="text-xs text-slate-400">{workStatsData.totalLateMinutes}min</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-slate-400 uppercase font-medium">En cours / Absents</p>
+                        <p className="font-bold text-blue-600">{workStatsData.inProgressCount}</p>
+                        <p className="text-xs text-red-400">{workStatsData.absentCount} abs.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recent pointages */}
+                  {workStatsData.recentPointages?.length > 0 && (
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="p-4 border-b border-slate-100">
+                        <h3 className="font-bold text-slate-800">Pointages récents</h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-50"><tr>
+                            {['Date', 'Shift', 'Prise', 'Fin', 'Heures', 'Statut'].map(h => (
+                              <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase">{h}</th>
+                            ))}
+                          </tr></thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {workStatsData.recentPointages.map((pt: any) => (
+                              <tr key={pt.id} className="hover:bg-slate-50">
+                                <td className="px-4 py-2.5 text-slate-600">{new Date(pt.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}</td>
+                                <td className="px-4 py-2.5"><span className={`text-xs font-medium px-2 py-0.5 rounded-full ${pt.shift === 'NUIT' ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-50 text-amber-700'}`}>{pt.shift === 'NUIT' ? 'Nuit' : 'Jour'}</span></td>
+                                <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{pt.checkInTime ? new Date(pt.checkInTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                                <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{pt.checkOutTime ? new Date(pt.checkOutTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                                <td className="px-4 py-2.5 font-semibold text-slate-700">{pt.hoursWorked ? fmtHours(pt.hoursWorked) : '—'}</td>
+                                <td className="px-4 py-2.5"><span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${pt.status === 'TERMINE' ? 'bg-green-100 text-green-700' : pt.status === 'EN_COURS' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>{pt.status === 'TERMINE' ? 'Terminé' : pt.status === 'EN_COURS' ? 'En cours' : 'Absent'}</span></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+                  <Timer size={40} className="mx-auto mb-3 text-slate-300" />
+                  <p className="text-slate-400">Sélectionnez un agent pour voir ses statistiques de travail</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── SOUS-TAB: PAIE (existing) ─── */}
+          {payrollSubTab === 'payroll' && (
+          <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-slate-800">Gestion de la paie</h2>
             <button onClick={() => { setCreateMonthForm({ month: now.getMonth() + 1, year: now.getFullYear() }); setShowCreateMonthModal(true) }}
@@ -457,6 +636,8 @@ export default function RH() {
               )}
             </div>
           )}
+          </div>
+        )}
         </div>
       )}
 
