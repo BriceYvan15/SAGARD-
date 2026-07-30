@@ -43,4 +43,5 @@ export const ROLE_LABELS: Record<string, string> = {
   AGENT_ACCUEIL:        'Agent Accueil',
   AGENT_TERRAIN:        'Agent Terrain',
   CLIENT:               'Client',
+  TECHNICIEN:           'Technicien',
 }
