@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Users, Plus, X, Save, Loader2, Shield, ShieldAlert, Edit,
   UserCheck, UserX, Mail, Phone, Eye, EyeOff,
@@ -6,6 +6,7 @@ import {
 import Pagination from '../components/Pagination'
 import { useApi } from '../lib/useApi'
 import { getUsers, createUser, suspendUser, activateUser, updateUser } from '../services/users.service'
+import { getClients } from '../services/clients.service'
 import { ROLE_LABELS } from '../lib/auth'
 import { hasAccess } from '../lib/roles'
 import Select from '../components/Select'
@@ -20,6 +21,8 @@ const ROLES_OPTIONS = [
   { value: 'TECHNICIENNE_SURFACE', label: 'Technicienne Surface',  color: 'bg-pink-100 text-pink-700' },
   { value: 'AGENT_ACCUEIL',        label: 'Agent Accueil',        color: 'bg-teal-100 text-teal-700' },
   { value: 'AGENT_TERRAIN',        label: 'Agent Terrain',        color: 'bg-slate-100 text-slate-700' },
+  { value: 'CLIENT',               label: 'Client',               color: 'bg-cyan-100 text-cyan-700' },
+  { value: 'TECHNICIEN',           label: 'Technicien',           color: 'bg-indigo-100 text-indigo-700' },
 ]
 
 const STATUS_CFG: Record<string, { label: string; cls: string }> = {
@@ -29,6 +32,7 @@ const STATUS_CFG: Record<string, { label: string; cls: string }> = {
 
 const EMPTY_FORM = {
   firstName: '', lastName: '', email: '', phone: '', whatsappPhone: '', role: 'COMMERCIAL', password: '',
+  clientId: '',
 }
 
 export default function Utilisateurs() {
@@ -48,6 +52,11 @@ export default function Utilisateurs() {
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const [showEditPwd, setShowEditPwd] = useState(false)
+  const [clients, setClients] = useState<any[]>([])
+
+  useEffect(() => {
+    if (form.role === 'CLIENT') getClients().then(setClients).catch(() => {})
+  }, [form.role])
 
   if (!hasAccess('utilisateurs')) return (
     <div className="flex flex-col items-center justify-center py-24 text-slate-400 gap-3">
@@ -287,6 +296,14 @@ export default function Utilisateurs() {
                 <Select value={form.role} onChange={setVal('role')}
                   options={ROLES_OPTIONS.map(r => ({ value: r.value, label: r.label }))} className="w-full" />
               </div>
+              {form.role === 'CLIENT' && (
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 mb-1 block">Client associé *</label>
+                  <Select value={form.clientId} onChange={setVal('clientId')}
+                    options={clients.map(c => ({ value: c.id, label: c.name }))}
+                    placeholder="— Sélectionner un client —" className="w-full" />
+                </div>
+              )}
               <div>
                 <label className="text-xs font-semibold text-slate-600 mb-1 block">Mot de passe *</label>
                 <div className="relative">
