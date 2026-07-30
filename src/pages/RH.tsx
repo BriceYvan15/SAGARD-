@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Users, DollarSign, Calendar, AlertTriangle, CheckCircle, Clock, Loader2, Plus, X, Award, UserPlus, FileText, Eye, Briefcase, Ban, Pencil, ShieldOff, ShieldCheck, Search, Trash2, TrendingUp, Timer, Target } from 'lucide-react'
+import { Users, DollarSign, Calendar, AlertTriangle, CheckCircle, Clock, Loader2, Plus, X, Award, UserPlus, FileText, Eye, Briefcase, Ban, Pencil, ShieldOff, ShieldCheck, Search, Trash2, TrendingUp, Timer, Target, Zap } from 'lucide-react'
 import { useApi } from '../lib/useApi'
 import { getPayrolls, createPayrollMonth, validatePayrollLine, payPayrollLine, deletePayroll, getPayslip, getPayrollDetail, updatePayrollLine, toggleBlockPayrollLine, getLeaves, createLeave, approveLeave, rejectLeave, getTrainings, createTraining, getCandidacies, createCandidacy, updateIntegrationStep, getContractExpiryAlerts, getIndisciplinedAgents, getDisciplinary, createDisciplinary, getContracts, getWorkStats } from '../services/hr.service'
 import { getTreasuryAccounts } from '../services/treasury.service'
