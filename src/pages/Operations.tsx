@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Activity, Search, Sun, Moon, Clock, Navigation,
   Loader2, Plus, X, MapPin, UserCheck, Play, Square, ArrowRightLeft, History
@@ -7,7 +7,7 @@ import AgentMap from '../components/AgentMap'
 import { useApi } from '../lib/useApi'
 import { fmtDate } from '../lib/utils'
 import {
-  getTodayPointages, getDeployments, createDeployment, activateDeployment,
+  getTodayPointages, getPointagesByDate, getDeployments, createDeployment, activateDeployment,
   endDeployment, transferDeployment, getTransfers
 } from '../services/operations.service'
 import { getAgents } from '../services/agents.service'
@@ -44,13 +44,31 @@ export default function Operations() {
   const [search, setSearch] = useState('')
   const [shiftFilter, setShift] = useState('all')
 
-  // Data
-  const { data: ptData, loading: ptLoading }   = useApi(getTodayPointages)
+  // Date filter for pointages
+  const [ptDate, setPtDate] = useState('') // empty = today
+  const [ptData, setPtData] = useState<any[] | null>(null)
+  const [ptLoading, setPtLoading] = useState(false)
+
+  const loadPointages = async (date: string) => {
+    setPtLoading(true)
+    try {
+      const data = date
+        ? await getPointagesByDate(date)
+        : await getTodayPointages()
+      setPtData(data)
+    } catch {
+      setPtData([])
+    } finally {
+      setPtLoading(false)
+    }
+  }
+
+  useEffect(() => { loadPointages(ptDate) }, [ptDate])
   const { data: depData, loading: depLoading, reload: reloadDeps } = useApi(getDeployments)
   const { data: agentsData } = useApi(getAgents)
   const { data: sitesData }  = useApi(getSites)
 
-  const pointages   = (ptData as any[]) ?? []
+  const pointages   = ptData ?? []
   const deployments = (depData as any[]) ?? []
   const agents      = (agentsData as any[]) ?? []
   const sites       = (sitesData as any[]) ?? []
@@ -172,10 +190,16 @@ export default function Operations() {
       {tab === 'pointages' && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 border-b border-slate-100">
-            <div className="relative w-full sm:w-72">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Agent, site..."
-                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-72">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Agent, site..."
+                  className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+              </div>
+              <DatePicker value={ptDate} onChange={v => setPtDate(v)} className="w-40" />
+              {ptDate && (
+                <button onClick={() => setPtDate('')} className="px-3 py-2 text-xs font-medium bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 whitespace-nowrap">Aujourd'hui</button>
+              )}
             </div>
             <div className="flex gap-2">
               {([{ key: 'all', label: 'Toutes' }, { key: 'jour', label: 'Jour', icon: <Sun size={12}/> }, { key: 'nuit', label: 'Nuit', icon: <Moon size={12}/> }]).map(s => (
@@ -209,7 +233,7 @@ export default function Operations() {
                   })}
                 </tbody>
               </table>
-              {filteredPt.length === 0 && <div className="text-center py-12 text-slate-400"><Activity size={40} className="mx-auto mb-3 opacity-30" /><p>Aucun pointage aujourd'hui</p></div>}
+              {filteredPt.length === 0 && <div className="text-center py-12 text-slate-400"><Activity size={40} className="mx-auto mb-3 opacity-30" /><p>Aucun pointage {ptDate ? 'à cette date' : 'aujourd\'hui'}</p></div>}
             </div>
           )}
         </div>
