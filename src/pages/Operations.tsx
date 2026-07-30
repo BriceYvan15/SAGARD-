@@ -235,7 +235,7 @@ export default function Operations() {
               <div className="flex gap-1 flex-wrap items-center">
                 {([
                   { key: 'all', label: 'Toutes dates', icon: Calendar },
-                  { key: 'today', label: 'Aujourd'hui', icon: Calendar },
+                  { key: 'today', label: "Aujourd'hui", icon: Calendar },
                   { key: 'week', label: 'Cette semaine', icon: Calendar },
                 ] as const).map(d => {
                   const Icon = d.icon
