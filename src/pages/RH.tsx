@@ -1,6 +1,6 @@
 import { Fragment, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Users, DollarSign, Calendar, AlertTriangle, CheckCircle, Clock, Loader2, Plus, X, Award, UserPlus, FileText, Eye, Briefcase, Ban, Pencil, ShieldOff, ShieldCheck, Search, Trash2, TrendingUp, Timer, Target, Zap } from 'lucide-react'
+import { Users, DollarSign, Calendar, AlertTriangle, CheckCircle, Clock, Loader2, Plus, X, Award, UserPlus, FileText, Eye, Briefcase, Ban, Pencil, ShieldOff, ShieldCheck, Search, Trash2, TrendingUp, Timer, Target, Zap, Download, Mail, CalendarDays, ChevronRight } from 'lucide-react'
 import { useApi } from '../lib/useApi'
 import { getPayrolls, createPayrollMonth, validatePayrollLine, payPayrollLine, deletePayroll, getPayslip, getPayrollDetail, updatePayrollLine, toggleBlockPayrollLine, getLeaves, createLeave, approveLeave, rejectLeave, getTrainings, createTraining, getCandidacies, createCandidacy, updateIntegrationStep, getContractExpiryAlerts, getIndisciplinedAgents, getDisciplinary, createDisciplinary, getContracts, getWorkStats, deletePointage } from '../services/hr.service'
 import { getTreasuryAccounts } from '../services/treasury.service'
@@ -120,6 +120,8 @@ export default function RH() {
   const [payLineData, setPayLineData] = useState<any | null>(null)
   const [payForm, setPayForm] = useState({ treasuryAccountId: '', paymentMethod: 'VIREMENT_BANCAIRE', reference: '' })
   const [paySaving, setPaySaving] = useState(false)
+  // Payroll drawer (slide-in sheet)
+  const [selectedLine, setSelectedLine] = useState<any | null>(null)
   // Treasury accounts for payment modal
   const { data: treasuryAccountsData } = useApi(getTreasuryAccounts)
   const treasuryAccounts = (treasuryAccountsData as any[]) ?? []
@@ -636,6 +638,8 @@ export default function RH() {
                         <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
                           <th className="px-6 py-3 font-medium">Employé</th>
                           <th className="hidden px-6 py-3 font-medium md:table-cell">Site</th>
+                          <th className="hidden px-6 py-3 font-medium text-center sm:table-cell">Jours</th>
+                          <th className="hidden px-6 py-3 font-medium text-center sm:table-cell">Heures</th>
                           <th className="hidden px-6 py-3 font-medium sm:table-cell text-right">Brut</th>
                           <th className="px-6 py-3 font-medium text-right">Net</th>
                           <th className="hidden px-6 py-3 font-medium sm:table-cell">Statut</th>
@@ -653,7 +657,7 @@ export default function RH() {
                           const siteName = l.agent?.deployments?.[0]?.site?.name ?? '—'
                           return (
                             <tr key={l.id} className={`cursor-pointer transition-colors hover:bg-slate-50 ${l.blocked ? 'bg-red-50/40' : ''}`}
-                              onClick={() => { setPayLineData(l); setPayForm({ treasuryAccountId: '', paymentMethod: 'VIREMENT_BANCAIRE', reference: '' }) }}>
+                              onClick={() => setSelectedLine(l)}>
                               <td className="px-6 py-4">
                                 <div className="flex items-center gap-3">
                                   <span className="flex size-9 items-center justify-center rounded-full bg-slate-100 text-xs font-medium text-slate-600">{initials}</span>
@@ -664,6 +668,8 @@ export default function RH() {
                                 </div>
                               </td>
                               <td className="hidden px-6 py-4 text-slate-500 md:table-cell">{siteName}</td>
+                              <td className="hidden px-6 py-4 text-center text-slate-600 sm:table-cell">{l.daysWorked ?? 0}j</td>
+                              <td className="hidden px-6 py-4 text-center text-slate-600 sm:table-cell">{l.hoursWorked ? fmtHours(l.hoursWorked) : '—'}</td>
                               <td className="hidden px-6 py-4 text-right text-slate-500 sm:table-cell">{fmt(l.grossSalary)}</td>
                               <td className="px-6 py-4 text-right font-medium text-slate-800">
                                 {l.blocked ? (
@@ -725,13 +731,13 @@ export default function RH() {
                           )
                         })}
                         {filteredLines.length === 0 && (
-                          <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm">Aucun agent trouvé</td></tr>
+                          <tr><td colSpan={8} className="px-6 py-12 text-center text-slate-400 text-sm">Aucun agent trouvé</td></tr>
                         )}
                       </tbody>
                       {filteredLines.length > 0 && (
                         <tfoot className="bg-slate-50 border-t-2 border-slate-100">
                           <tr className="font-bold">
-                            <td colSpan={2} className="px-6 py-3 text-slate-700">Total ({filteredLines.length} agents)</td>
+                            <td colSpan={4} className="px-6 py-3 text-slate-700">Total ({filteredLines.length} agents)</td>
                             <td className="hidden px-6 py-3 text-right text-slate-700 sm:table-cell">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.grossSalary), 0))}</td>
                             <td className="px-6 py-3 text-right text-green-700">{fmt(filteredLines.reduce((s: number, l: any) => s + Number(l.netSalary), 0))}</td>
                             <td colSpan={2}></td>
@@ -1461,6 +1467,171 @@ export default function RH() {
               <button onClick={handleDeletePayroll} disabled={deleteLoading}
                 className="flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 disabled:opacity-60">
                 {deleteLoading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Supprimer définitivement
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ═══ Drawer Paie (slide-in sheet) ═══ */}
+    {selectedLine && (
+      <div className="fixed inset-0 z-50 flex">
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSelectedLine(null)} />
+        {/* Panel */}
+        <div className="relative ml-auto h-full w-full overflow-y-auto bg-white shadow-2xl border-l border-slate-200 sm:max-w-md animate-in slide-in-from-right duration-300">
+          {/* Close button */}
+          <button onClick={() => setSelectedLine(null)}
+            className="absolute right-4 top-4 z-10 rounded-lg p-1.5 opacity-70 hover:opacity-100 hover:bg-slate-100 transition-opacity cursor-pointer">
+            <X size={18} className="text-slate-500" />
+          </button>
+
+          {/* Header */}
+          <div className="flex flex-col space-y-2 border-b border-slate-100 p-6 pt-8">
+            <h2 className="text-2xl font-normal text-slate-800">
+              {selectedLine.agent?.user?.firstName} {selectedLine.agent?.user?.lastName}
+            </h2>
+            <p className="text-sm text-slate-400">
+              {selectedLine.agent?.position ?? 'Agent'} · {selectedLine.agent?.deployments?.[0]?.site?.name ?? '—'}
+            </p>
+          </div>
+
+          <div className="space-y-6 p-6">
+            {/* Info cards grid */}
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-lg border border-slate-200 p-3">
+                <p className="flex items-center gap-1.5 text-xs text-slate-400">
+                  <Mail size={12} /> Email
+                </p>
+                <p className="mt-1 truncate text-sm text-slate-700">{selectedLine.agent?.user?.email ?? '—'}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-3">
+                <p className="flex items-center gap-1.5 text-xs text-slate-400">
+                  <CalendarDays size={12} /> Depuis
+                </p>
+                <p className="mt-1 truncate text-sm text-slate-700">
+                  {selectedLine.agent?.hireDate ? new Date(selectedLine.agent.hireDate).toLocaleDateString('fr-FR') : '—'}
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-3">
+                <p className="flex items-center gap-1.5 text-xs text-slate-400">Matricule</p>
+                <p className="mt-1 truncate text-sm text-slate-700 font-mono">{selectedLine.agent?.matricule ?? '—'}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-3">
+                <p className="flex items-center gap-1.5 text-xs text-slate-400">Téléphone</p>
+                <p className="mt-1 truncate text-sm text-slate-700">{selectedLine.agent?.user?.phone ?? '—'}</p>
+              </div>
+            </div>
+
+            {/* Work stats mini-cards */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-slate-200 p-3 text-center">
+                <p className="text-xs text-slate-400">Jours travaillés</p>
+                <p className="mt-1 text-xl font-bold text-slate-800">{selectedLine.daysWorked ?? 0}<span className="text-sm font-normal text-slate-400">j</span></p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-3 text-center">
+                <p className="text-xs text-slate-400">Heures travaillées</p>
+                <p className="mt-1 text-xl font-bold text-slate-800">{selectedLine.hoursWorked ? fmtHours(selectedLine.hoursWorked) : '—'}</p>
+              </div>
+            </div>
+
+            {/* Bulletin */}
+            <div className="rounded-xl border border-slate-200">
+              <p className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-700">
+                Bulletin de {new Date(2000, selectedMonth - 1).toLocaleString('fr-FR', { month: 'long' })} {selectedYear}
+              </p>
+              <div className="space-y-2 p-4 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Salaire de base</span>
+                  <span className="text-slate-700">{fmt(selectedLine.baseSalary)}</span>
+                </div>
+                {Number(selectedLine.bonuses) > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Primes</span>
+                    <span className="text-emerald-600">+{fmt(selectedLine.bonuses)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-slate-700">Brut total</span>
+                  <span className="font-medium text-slate-800">{fmt(selectedLine.grossSalary)}</span>
+                </div>
+                {Number(selectedLine.deductions) > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Retenues</span>
+                    <span className="text-red-600">-{fmt(selectedLine.deductions)}</span>
+                  </div>
+                )}
+                {selectedLine.blocked && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-red-500 flex items-center gap-1"><Ban size={12} /> Bloqué</span>
+                    <span className="text-xs text-red-400">{selectedLine.blockReason ?? '—'}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between border-t border-slate-200 pt-3">
+                  <span className="font-medium text-slate-700">Net à payer</span>
+                  <span className="text-2xl font-bold text-slate-800">{fmt(selectedLine.netSalary)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Status badge */}
+            <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+              <span className="text-sm text-slate-400">Statut</span>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${(STATUS_LINE[selectedLine.paymentStatus] ?? { cls: 'bg-slate-100 text-slate-600' }).cls}`}>
+                {(STATUS_LINE[selectedLine.paymentStatus] ?? { label: selectedLine.paymentStatus }).label}
+              </span>
+            </div>
+
+            {/* Action buttons */}
+            <div className="space-y-2">
+              {selectedLine.paymentStatus === 'BROUILLON' && (
+                <>
+                  <button onClick={() => { handleValidateLine(selectedLine.id); setSelectedLine(null) }} disabled={actionLoading === selectedLine.id}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-60">
+                    {actionLoading === selectedLine.id ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                    Valider la ligne
+                  </button>
+                  <button onClick={() => { openEditLine(selectedLine); setSelectedLine(null) }}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50">
+                    <Pencil size={16} /> Modifier
+                  </button>
+                  <button onClick={() => { setBlockLine(selectedLine); setBlockReason(selectedLine.blockReason ?? ''); setSelectedLine(null) }}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50">
+                    <ShieldOff size={16} /> Bloquer
+                  </button>
+                </>
+              )}
+              {selectedLine.paymentStatus === 'VALIDE' && (
+                <>
+                  <button onClick={() => { setPayLineData(selectedLine); setPayForm({ treasuryAccountId: '', paymentMethod: 'VIREMENT_BANCAIRE', reference: '' }); setSelectedLine(null) }}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-700">
+                    <DollarSign size={16} /> Payer
+                  </button>
+                  <button onClick={() => { openEditLine(selectedLine); setSelectedLine(null) }}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50">
+                    <Pencil size={16} /> Modifier
+                  </button>
+                  <button onClick={() => { setBlockLine(selectedLine); setBlockReason(selectedLine.blockReason ?? ''); setSelectedLine(null) }}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50">
+                    <ShieldOff size={16} /> Bloquer
+                  </button>
+                </>
+              )}
+              {selectedLine.paymentStatus === 'BLOQUE' && (
+                <button onClick={() => { setBlockLine(selectedLine); setBlockReason(selectedLine.blockReason ?? ''); setSelectedLine(null) }}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-700">
+                  <ShieldCheck size={16} /> Débloquer
+                </button>
+              )}
+              <button onClick={async () => {
+                setPayslipLoading(true)
+                try { const data = await getPayslip(selectedLine.id); setPayslipData(data) } catch { alert('Erreur chargement fiche') } finally { setPayslipLoading(false) }
+                setSelectedLine(null)
+              }}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-sagard-yellow px-4 py-2.5 text-sm font-bold text-sagard-dark transition-colors hover:bg-sagard-yellow-dark">
+                {payslipLoading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                Télécharger le bulletin
               </button>
             </div>
           </div>
