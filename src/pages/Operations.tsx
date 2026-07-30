@@ -56,8 +56,9 @@ export default function Operations() {
     setPtLoading(true)
     try {
       let data: any[]
+      const todayStr = new Date().toISOString().slice(0, 10)
       if (dateMode === 'today') {
-        data = await getTodayPointages()
+        data = await getPointagesByDate(todayStr)
       } else if (dateMode === 'custom' && ptDate) {
         data = await getPointagesByDate(ptDate)
       } else if (dateMode === 'week') {
