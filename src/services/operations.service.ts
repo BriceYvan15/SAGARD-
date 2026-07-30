@@ -3,6 +3,7 @@ import { api } from '../lib/api'
 // Pointages
 export const getTodayPointages  = (p?: any) => api.get('/pointages/today', { params: p }).then(r => r.data)
 export const getPointagesByDate = (date: string, p?: any) => api.get('/pointages/by-date', { params: { date, ...p } }).then(r => r.data)
+export const getPointagesRange  = (start: string, end: string, p?: any) => api.get('/pointages/range', { params: { start, end, ...p } }).then(r => r.data)
 export const getDailyReport     = (date: string, siteId?: string) => api.get('/pointages/report', { params: { date, siteId } }).then(r => r.data)
 export const getAgentPointages  = (agentId: string, start: string, end: string) => api.get(`/pointages/agent/${agentId}`, { params: { start, end } }).then(r => r.data)
 
