@@ -2,10 +2,11 @@ import { Fragment, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Users, DollarSign, Calendar, AlertTriangle, CheckCircle, Clock, Loader2, Plus, X, Award, UserPlus, FileText, Eye, Briefcase, Ban, Pencil, ShieldOff, ShieldCheck, Search, Trash2, TrendingUp, Timer, Target, Zap } from 'lucide-react'
 import { useApi } from '../lib/useApi'
-import { getPayrolls, createPayrollMonth, validatePayrollLine, payPayrollLine, deletePayroll, getPayslip, getPayrollDetail, updatePayrollLine, toggleBlockPayrollLine, getLeaves, createLeave, approveLeave, rejectLeave, getTrainings, createTraining, getCandidacies, createCandidacy, updateIntegrationStep, getContractExpiryAlerts, getIndisciplinedAgents, getDisciplinary, createDisciplinary, getContracts, getWorkStats } from '../services/hr.service'
+import { getPayrolls, createPayrollMonth, validatePayrollLine, payPayrollLine, deletePayroll, getPayslip, getPayrollDetail, updatePayrollLine, toggleBlockPayrollLine, getLeaves, createLeave, approveLeave, rejectLeave, getTrainings, createTraining, getCandidacies, createCandidacy, updateIntegrationStep, getContractExpiryAlerts, getIndisciplinedAgents, getDisciplinary, createDisciplinary, getContracts, getWorkStats, deletePointage } from '../services/hr.service'
 import { getTreasuryAccounts } from '../services/treasury.service'
 import { getAgents } from '../services/agents.service'
 import { fmt, fmtDate } from '../lib/utils'
+import { getUser } from '../lib/auth'
 import NewPostulantModal from '../components/NewPostulantModal'
 import ConvertToAgentModal from '../components/ConvertToAgentModal'
 import Select from '../components/Select'
@@ -478,7 +479,7 @@ export default function RH() {
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead className="bg-slate-50"><tr>
-                            {['Date', 'Shift', 'Prise', 'Fin', 'Heures', 'Statut'].map(h => (
+                            {['Date', 'Shift', 'Prise', 'Fin', 'Heures', 'Statut', ...(getUser()?.role === 'DIRECTEUR_GENERAL' ? ['Actions'] : [])].map(h => (
                               <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase">{h}</th>
                             ))}
                           </tr></thead>
@@ -491,6 +492,25 @@ export default function RH() {
                                 <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{pt.checkOutTime ? new Date(pt.checkOutTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                                 <td className="px-4 py-2.5 font-semibold text-slate-700">{pt.hoursWorked ? fmtHours(pt.hoursWorked) : '—'}</td>
                                 <td className="px-4 py-2.5"><span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${pt.status === 'TERMINE' ? 'bg-green-100 text-green-700' : pt.status === 'EN_COURS' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>{pt.status === 'TERMINE' ? 'Terminé' : pt.status === 'EN_COURS' ? 'En cours' : 'Absent'}</span></td>
+                                {getUser()?.role === 'DIRECTEUR_GENERAL' && (
+                                  <td className="px-4 py-2.5">
+                                    <button
+                                      onClick={async () => {
+                                        if (!confirm('Supprimer ce pointage ? Cette action est irréversible.')) return
+                                        try {
+                                          await deletePointage(pt.id)
+                                          setWorkStatsData((prev: any) => prev ? { ...prev, recentPointages: prev.recentPointages.filter((p: any) => p.id !== pt.id) } : prev)
+                                        } catch (e: any) {
+                                          alert(e?.response?.data?.message ?? 'Erreur lors de la suppression')
+                                        }
+                                      }}
+                                      className="text-red-500 hover:text-red-700 transition-colors"
+                                      title="Supprimer le pointage"
+                                    >
+                                      <Trash2 size={15} />
+                                    </button>
+                                  </td>
+                                )}
                               </tr>
                             ))}
                           </tbody>
