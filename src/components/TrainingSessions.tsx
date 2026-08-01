@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect } from 'react'
-import { Users, Calendar, Loader2, Plus, X, Award, FileText, Video, ClipboardCheck, Trash2, Eye, Send, CheckCircle, XCircle, Clock, ChevronLeft } from 'lucide-react'
+import { Users, Calendar, Loader2, Plus, X, Award, FileText, Video, ClipboardCheck, Trash2, Eye, Send, CheckCircle, XCircle, Clock, ChevronLeft, UserPlus } from 'lucide-react'
 import { useApi } from '../lib/useApi'
 import {
   getTrainingSessions, getTrainingSession, createTrainingSession, updateTrainingSession,
@@ -233,8 +233,6 @@ export default function TrainingSessions() {
             <div className="flex gap-2 pt-4 border-t border-slate-100">
               <button onClick={() => { setEditSession(detailSession); setSessionForm({ title: detailSession.title, description: detailSession.description ?? '', type: detailSession.type, trainer: detailSession.trainer ?? '', location: detailSession.location ?? '', startDate: detailSession.startDate ?? '', endDate: detailSession.endDate ?? '', passingScore: detailSession.passingScore ?? 70, content: detailSession.content ?? '', videoUrl: detailSession.videoUrl ?? '' }); setShowCreateModal(true) }}
                 className="px-3 py-1.5 text-sm font-medium border border-slate-200 rounded-lg hover:bg-slate-50">Modifier</button>
-              <button onClick={() => { setSelectedAgentIds(detailSession.participants?.map((p: any) => p.agentId) ?? []); setShowParticipantModal(true) }}
-                className="px-3 py-1.5 text-sm font-medium border border-slate-200 rounded-lg hover:bg-slate-50">Participants ({detailSession.participants?.length ?? 0})</button>
               <button onClick={handlePublish} disabled={publishing}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60">
                 {publishing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Publier
@@ -315,10 +313,10 @@ export default function TrainingSessions() {
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <h3 className="font-semibold text-slate-800">Participants ({detailSession.participants?.length ?? 0})</h3>
-            {detailSession.status !== 'BROUILLON' && (
-              <button onClick={() => { setSelectedAgentIds(detailSession.participants?.map((p: any) => p.agentId) ?? []); setShowParticipantModal(true) }}
-                className="text-sm text-blue-600 hover:underline">Modifier</button>
-            )}
+            <button onClick={() => { setSelectedAgentIds(detailSession.participants?.map((p: any) => p.agentId) ?? []); setShowParticipantModal(true) }}
+              className="flex items-center gap-1.5 text-sm font-bold text-sagard-dark bg-sagard-yellow hover:bg-sagard-yellow-dark px-3 py-1.5 rounded-lg">
+              <UserPlus size={14} /> {detailSession.participants?.length ? 'Modifier' : 'Ajouter des participants'}
+            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
