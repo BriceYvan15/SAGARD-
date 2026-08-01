@@ -2,13 +2,14 @@ import { Fragment, useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Users, DollarSign, Calendar, AlertTriangle, CheckCircle, Clock, Loader2, Plus, X, Award, UserPlus, FileText, Eye, Briefcase, Ban, Pencil, ShieldOff, ShieldCheck, Search, Trash2, TrendingUp, Timer, Target, Zap, Download, Mail, CalendarDays, ChevronRight } from 'lucide-react'
 import { useApi } from '../lib/useApi'
-import { getPayrolls, createPayrollMonth, validatePayrollLine, payPayrollLine, deletePayroll, getPayslip, getPayrollDetail, updatePayrollLine, toggleBlockPayrollLine, getLeaves, createLeave, approveLeave, rejectLeave, getTrainings, createTraining, getCandidacies, createCandidacy, updateIntegrationStep, getContractExpiryAlerts, getIndisciplinedAgents, getDisciplinary, createDisciplinary, getContracts, getWorkStats, deletePointage } from '../services/hr.service'
+import { getPayrolls, createPayrollMonth, validatePayrollLine, payPayrollLine, deletePayroll, getPayslip, getPayrollDetail, updatePayrollLine, toggleBlockPayrollLine, getLeaves, createLeave, approveLeave, rejectLeave, getCandidacies, createCandidacy, updateIntegrationStep, getContractExpiryAlerts, getIndisciplinedAgents, getDisciplinary, createDisciplinary, getContracts, getWorkStats, deletePointage } from '../services/hr.service'
 import { getTreasuryAccounts } from '../services/treasury.service'
 import { getAgents } from '../services/agents.service'
 import { fmt, fmtDate } from '../lib/utils'
 import { getUser } from '../lib/auth'
 import NewPostulantModal from '../components/NewPostulantModal'
 import ConvertToAgentModal from '../components/ConvertToAgentModal'
+import TrainingSessions from '../components/TrainingSessions'
 import Select from '../components/Select'
 import DatePicker from '../components/DatePicker'
 
@@ -53,7 +54,6 @@ function fmtHours(hours: number): string {
 const EMPTY_CANDIDACY = { firstName: '', lastName: '', phone: '', email: '', cniNumber: '', position: '' }
 const EMPTY_DISCIPLINARY = { agentId: '', type: 'FAUTE', description: '', date: '', sanction: '' }
 const EMPTY_LEAVE = { agentId: '', type: 'CONGE_ANNUEL', startDate: '', endDate: '', reason: '' }
-const EMPTY_TRAINING = { title: '', description: '', trainer: '', location: '', startDate: '', endDate: '', agentIds: [] as string[] }
 
 export default function RH() {
   const [searchParams] = useSearchParams()
@@ -72,9 +72,6 @@ export default function RH() {
   // Congés modal
   const [showLeaveModal, setShowLeaveModal] = useState(false)
   const [leaveForm, setLeaveForm]   = useState({ ...EMPTY_LEAVE })
-  // Formations modal
-  const [showTrainModal, setShowTrainModal] = useState(false)
-  const [trainForm, setTrainForm]   = useState({ ...EMPTY_TRAINING })
   // Fiche de paie modal
   const [payslipData, setPayslipData] = useState<any | null>(null)
   const [payslipLoading, setPayslipLoading] = useState(false)
@@ -128,7 +125,6 @@ export default function RH() {
 
   const { data: payrolls, loading: pLoad, reload: reloadP }   = useApi(getPayrolls)
   const { data: leaves,   loading: lLoad, reload: reloadL }   = useApi(getLeaves)
-  const { data: trainings, loading: tLoad, reload: reloadT }  = useApi(getTrainings)
   const { data: candidacies, loading: cLoad, reload: reloadC } = useApi(getCandidacies)
   const { data: disciplinary, loading: dLoad, reload: reloadD } = useApi(getDisciplinary)
   const { data: expiryAlerts, loading: eLoad }                  = useApi(getContractExpiryAlerts)
@@ -850,45 +846,7 @@ export default function RH() {
 
       {/* FORMATIONS */}
       {tab === 'trainings' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-slate-800">Formations</h2>
-            <button onClick={() => { setTrainForm({ ...EMPTY_TRAINING }); setFormError(null); setShowTrainModal(true) }}
-              className="flex items-center gap-2 bg-sagard-yellow hover:bg-sagard-yellow-dark text-sagard-dark text-sm font-bold px-4 py-2 rounded-xl transition-colors">
-              <Plus size={16} /> Planifier une formation
-            </button>
-          </div>
-          {tLoad ? (
-            <div className="flex justify-center py-12"><Loader2 className="animate-spin text-slate-400" /></div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {((trainings as any[]) ?? []).map((t: any) => (
-                <div key={t.id} className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md hover:-translate-y-0.5 transition-all">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-semibold text-slate-800 text-sm">{t.title}</h3>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      t.status === 'PLANIFIE' ? 'bg-blue-100 text-blue-700' :
-                      t.status === 'EN_COURS' ? 'bg-amber-100 text-amber-700' :
-                      'bg-green-100 text-green-700'
-                    }`}>{t.status}</span>
-                  </div>
-                  <p className="text-xs text-slate-500">{t.type} · {t.provider ?? 'Interne'}</p>
-                  <div className="flex items-center gap-1 mt-2 text-xs text-slate-400">
-                    <Calendar size={12} />
-                    {fmtDate(t.startDate)} → {fmtDate(t.endDate)}
-                  </div>
-                  <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
-                    <Users size={12} />
-                    {t.participants?.length ?? 0} participant(s)
-                  </div>
-                </div>
-              ))}
-              {((trainings as any[]) ?? []).length === 0 && (
-                <div className="col-span-3 text-center text-slate-400 text-sm py-10">Aucune formation planifiée</div>
-              )}
-            </div>
-          )}
-        </div>
+        <TrainingSessions />
       )}
 
       {/* CANDIDATURES & INTÉGRATION */}
@@ -1305,100 +1263,6 @@ export default function RH() {
               <button type="submit" disabled={saving}
                 className="flex items-center gap-2 px-5 py-2 bg-sagard-yellow text-sagard-dark rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark disabled:opacity-60">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Calendar size={14} />} Soumettre
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    )}
-
-    {/* ═══ Modal Planifier une formation ═══ */}
-    {showTrainModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Award size={18} className="text-sagard-yellow-dark" /> Planifier une formation</h2>
-            <button onClick={() => setShowTrainModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} className="text-slate-500" /></button>
-          </div>
-          <form onSubmit={async (e) => {
-            e.preventDefault()
-            if (!trainForm.title || !trainForm.startDate || trainForm.agentIds.length === 0) { setFormError('Titre, date de début et au moins un participant sont obligatoires.'); return }
-            setSaving(true); setFormError(null)
-            try {
-              for (const agentId of trainForm.agentIds) {
-                await createTraining({
-                  agentId,
-                  title: trainForm.title,
-                  description: trainForm.description || undefined,
-                  trainer: trainForm.trainer || undefined,
-                  location: trainForm.location || undefined,
-                  startDate: new Date(trainForm.startDate),
-                  endDate: trainForm.endDate ? new Date(trainForm.endDate) : undefined,
-                })
-              }
-              setShowTrainModal(false); setTrainForm({ ...EMPTY_TRAINING }); reloadT()
-            } catch (err: any) { setFormError(err.response?.data?.message ?? 'Erreur') }
-            finally { setSaving(false) }
-          }} className="px-6 py-5 space-y-4">
-            {formError && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{formError}</div>}
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Titre de la formation *</label>
-              <input value={trainForm.title} onChange={e => setTrainForm(f => ({ ...f, title: e.target.value }))} required
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" placeholder="Ex: Formation sécurité incendie" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
-              <textarea value={trainForm.description} onChange={e => setTrainForm(f => ({ ...f, description: e.target.value }))} rows={2}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 resize-none" placeholder="Détails de la formation..." />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Formateur</label>
-                <input value={trainForm.trainer} onChange={e => setTrainForm(f => ({ ...f, trainer: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" placeholder="Nom du formateur" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Lieu</label>
-                <input value={trainForm.location} onChange={e => setTrainForm(f => ({ ...f, location: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" placeholder="Lieu de la formation" />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Date début *</label>
-                <DatePicker value={trainForm.startDate} onChange={v => setTrainForm(f => ({ ...f, startDate: v }))} className="w-full" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Date fin</label>
-                <DatePicker value={trainForm.endDate} onChange={v => setTrainForm(f => ({ ...f, endDate: v }))} className="w-full" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Participants * ({trainForm.agentIds.length} sélectionné{trainForm.agentIds.length > 1 ? 's' : ''})</label>
-              <div className="border border-slate-200 rounded-lg max-h-40 overflow-y-auto p-2 space-y-1">
-                {agents.map((a: any) => {
-                  const checked = trainForm.agentIds.includes(a.id)
-                  return (
-                    <label key={a.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-sm transition-colors ${checked ? 'bg-sagard-yellow/10 text-slate-800' : 'hover:bg-slate-50 text-slate-600'}`}>
-                      <input type="checkbox" checked={checked} onChange={() => {
-                        setTrainForm(f => ({
-                          ...f,
-                          agentIds: checked ? f.agentIds.filter(id => id !== a.id) : [...f.agentIds, a.id]
-                        }))
-                      }} className="rounded border-slate-300" />
-                      <span className="font-medium">{a.user?.firstName} {a.user?.lastName}</span>
-                      <span className="text-xs text-slate-400">({a.matricule})</span>
-                    </label>
-                  )
-                })}
-                {agents.length === 0 && <p className="text-xs text-slate-400 text-center py-2">Aucun agent disponible</p>}
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={() => setShowTrainModal(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 bg-white">Annuler</button>
-              <button type="submit" disabled={saving}
-                className="flex items-center gap-2 px-5 py-2 bg-sagard-yellow text-sagard-dark rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark disabled:opacity-60">
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <Award size={14} />} Planifier
               </button>
             </div>
           </form>
