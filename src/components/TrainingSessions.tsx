@@ -185,6 +185,7 @@ export default function TrainingSessions() {
   if (detailSession) {
     const Icon = TYPE_ICONS[detailSession.type] ?? FileText
     return (
+      <Fragment>
       <div className="space-y-4">
         <button onClick={() => setDetailSession(null)} className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
           <ChevronLeft size={16} /> Retour
@@ -361,6 +362,133 @@ export default function TrainingSessions() {
           </div>
         </div>
       </div>
+
+      {/* ═══ Modal Créer/Modifier session ═══ */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <Award size={18} className="text-sagard-yellow-dark" /> {editSession ? 'Modifier la formation' : 'Nouvelle formation'}
+              </h2>
+              <button onClick={() => setShowCreateModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} className="text-slate-500" /></button>
+            </div>
+            <form onSubmit={handleSaveSession} className="px-6 py-5 space-y-4">
+              {formError && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{formError}</div>}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Titre *</label>
+                <input value={sessionForm.title} onChange={e => setSessionForm(f => ({ ...f, title: e.target.value }))} required
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" placeholder="Ex: Formation sécurité incendie" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Type de formation *</label>
+                <Select value={sessionForm.type} onChange={v => setSessionForm(f => ({ ...f, type: v }))}
+                  options={[
+                    { value: 'QCM', label: 'QCM (Questions à choix multiples)' },
+                    { value: 'LECTURE', label: 'Lecture (Document à lire)' },
+                    { value: 'VIDEO', label: 'Vidéo (À visionner)' },
+                    { value: 'PRATIQUE', label: 'Pratique (Évaluation sur le terrain)' },
+                  ]} className="w-full" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
+                <textarea value={sessionForm.description} onChange={e => setSessionForm(f => ({ ...f, description: e.target.value }))} rows={2}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 resize-none" placeholder="Détails de la formation..." />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Formateur</label>
+                  <input value={sessionForm.trainer} onChange={e => setSessionForm(f => ({ ...f, trainer: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" placeholder="Nom du formateur" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Lieu</label>
+                  <input value={sessionForm.location} onChange={e => setSessionForm(f => ({ ...f, location: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" placeholder="Lieu de la formation" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Date début</label>
+                  <DatePicker value={sessionForm.startDate} onChange={v => setSessionForm(f => ({ ...f, startDate: v }))} className="w-full" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Date fin</label>
+                  <DatePicker value={sessionForm.endDate} onChange={v => setSessionForm(f => ({ ...f, endDate: v }))} className="w-full" />
+                </div>
+              </div>
+
+              {sessionForm.type === 'QCM' && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Score de réussite (%)</label>
+                  <input type="number" min={0} max={100} value={sessionForm.passingScore} onChange={e => setSessionForm(f => ({ ...f, passingScore: Number(e.target.value) }))}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" />
+                </div>
+              )}
+              {sessionForm.type === 'LECTURE' && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Contenu à lire</label>
+                  <textarea value={sessionForm.content} onChange={e => setSessionForm(f => ({ ...f, content: e.target.value }))} rows={5}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40 resize-none" placeholder="Tapez le contenu de la formation ici..." />
+                </div>
+              )}
+              {sessionForm.type === 'VIDEO' && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">URL de la vidéo</label>
+                  <input value={sessionForm.videoUrl} onChange={e => setSessionForm(f => ({ ...f, videoUrl: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sagard-yellow/40" placeholder="https://..." />
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowCreateModal(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 bg-white">Annuler</button>
+                <button type="submit" disabled={saving}
+                  className="flex items-center gap-2 px-5 py-2 bg-sagard-yellow text-sagard-dark rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark disabled:opacity-60">
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Award size={14} />} {editSession ? 'Enregistrer' : 'Créer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Modal Participants ═══ */}
+      {showParticipantModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl">
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-sagard-yellow-dark" /> Assigner les participants</h2>
+              <button onClick={() => setShowParticipantModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} className="text-slate-500" /></button>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              <p className="text-sm text-slate-500">{selectedAgentIds.length} agent(s) sélectionné(s)</p>
+              <div className="border border-slate-200 rounded-lg max-h-60 overflow-y-auto p-2 space-y-1">
+                {agents.map((a: any) => {
+                  const checked = selectedAgentIds.includes(a.id)
+                  return (
+                    <label key={a.id} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-sm transition-colors ${checked ? 'bg-sagard-yellow/10 text-slate-800' : 'hover:bg-slate-50 text-slate-600'}`}>
+                      <input type="checkbox" checked={checked} onChange={() => {
+                        setSelectedAgentIds(checked ? selectedAgentIds.filter(id => id !== a.id) : [...selectedAgentIds, a.id])
+                      }} className="rounded border-slate-300" />
+                      <span className="font-medium">{a.user?.firstName} {a.user?.lastName}</span>
+                      <span className="text-xs text-slate-400">({a.matricule})</span>
+                    </label>
+                  )
+                })}
+                {agents.length === 0 && <p className="text-xs text-slate-400 text-center py-2">Aucun agent disponible</p>}
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowParticipantModal(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 bg-white">Annuler</button>
+                <button onClick={handleSaveParticipants} disabled={participantSaving}
+                  className="flex items-center gap-2 px-5 py-2 bg-sagard-yellow text-sagard-dark rounded-lg text-sm font-bold hover:bg-sagard-yellow-dark disabled:opacity-60">
+                  {participantSaving ? <Loader2 size={14} className="animate-spin" /> : <Users size={14} />} Enregistrer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      </Fragment>
     )
   }
 
