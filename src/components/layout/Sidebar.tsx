@@ -5,7 +5,7 @@ import {
   Activity, Receipt, Settings, LogOut,
   UsersRound, Package, Bot, Bell, ClipboardList, Target,
   FileCheck, FileBadge, Briefcase, UserCog, DoorOpen, Calculator, History,
-  ChevronDown, ChevronLeft, ChevronRight, X,
+  ChevronDown, ChevronLeft, ChevronRight, X, Footprints,
 } from 'lucide-react'
 import { getUser, ROLE_LABELS } from '../../lib/auth'
 import { hasAccess } from '../../lib/roles'
@@ -45,6 +45,7 @@ const navGroups: NavGroup[] = [
       { to: '/sites',       icon: MapPin,        label: 'Sites gardiennés' },
       { to: '/agents',      icon: UserCheck,     label: 'Agents' },
       { to: '/operations',  icon: Activity,      label: 'Opérations' },
+      { to: '/rondes',       icon: Footprints,    label: 'Rondes' },
       { to: '/supervision', icon: Bell,          label: 'Supervision' },
       { to: '/registres',   icon: ClipboardList, label: 'Registres site' },
     ],

@@ -9,6 +9,7 @@ import Contrats from './pages/Contrats'
 import Sites from './pages/Sites'
 import Agents from './pages/Agents'
 import Operations from './pages/Operations'
+import Rondes from './pages/Rondes'
 import Facturation from './pages/Facturation'
 import InvoiceDetail from './pages/InvoiceDetail'
 import RH from './pages/RH'
@@ -51,6 +52,7 @@ export default function App() {
             <Route path="sites"       element={<Sites />} />
             <Route path="agents"      element={<Agents />} />
             <Route path="operations"  element={<Operations />} />
+            <Route path="rondes"      element={<Rondes />} />
             <Route path="supervision" element={<Supervision />} />
             <Route path="registres"   element={<Registres />} />
             <Route path="prospects"  element={<Prospects />} />
