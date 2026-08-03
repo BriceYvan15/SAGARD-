@@ -31,8 +31,8 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'alertes-commerciales',    // Tableau de bord alertes
   ],
   RH: ['rh', 'agents', 'utilisateurs', 'audit'],
-  CHEF_OPERATIONS: ['operations', 'sites', 'agents', 'supervision', 'registres', 'accueil', 'audit'],
-  CONTROLEUR: ['operations', 'supervision'],
+  CHEF_OPERATIONS: ['operations', 'sites', 'agents', 'supervision', 'registres', 'accueil', 'audit', 'rondes'],
+  CONTROLEUR: ['operations', 'supervision', 'rondes'],
   TECHNICIENNE_SURFACE: [],
   AGENT_ACCUEIL: ['accueil', 'stock'],
   AGENT_TERRAIN: [],
