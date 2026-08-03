@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Footprints, MapPin, Clock, CheckCircle2, AlertTriangle, XCircle,
-  Loader2, ChevronRight, X, Calendar,
+  Loader2, ChevronRight, X, Calendar, ChevronLeft,
 } from 'lucide-react'
 import { useApi } from '../lib/useApi'
 import { clsx } from '../lib/utils'
@@ -33,6 +33,8 @@ export default function Rondes() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 10
 
   const { data: rounds, loading } = useApi(
     () => getPatrols({
@@ -57,6 +59,13 @@ export default function Rondes() {
   }, [allRounds])
 
   const hasDateFilter = dateFrom || dateTo
+
+  useEffect(() => { setPage(1) }, [filterState, dateFrom, dateTo])
+
+  // Reset page when filters change
+  const totalPages = Math.max(1, Math.ceil(allRounds.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const paginatedRounds = allRounds.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   return (
     <div className="space-y-6">
@@ -155,7 +164,7 @@ export default function Rondes() {
               </tr>
             </thead>
             <tbody>
-              {allRounds.map((r: any) => {
+              {paginatedRounds.map((r: any) => {
                 const cfg = STATE_CONFIG[r.state] ?? STATE_CONFIG.EN_COURS
                 const agentName = r.agent?.user ? `${r.agent.user.firstName} ${r.agent.user.lastName}` : '—'
                 return (
@@ -210,6 +219,51 @@ export default function Rondes() {
               })}
             </tbody>
           </table>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
+              <span className="text-xs text-slate-500">
+                {allRounds.length} ronde{allRounds.length > 1 ? 's' : ''} · Page {currentPage}/{totalPages}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                  .map((p, idx, arr) => (
+                    <span key={p} className="flex items-center">
+                      {idx > 0 && arr[idx - 1] !== p - 1 && (
+                        <span className="px-1 text-slate-300 text-xs">...</span>
+                      )}
+                      <button
+                        onClick={() => setPage(p)}
+                        className={clsx(
+                          'w-8 h-8 rounded-lg text-xs font-bold transition',
+                          p === currentPage
+                            ? 'bg-sagard-yellow text-sagard-dark'
+                            : 'text-slate-500 hover:bg-slate-100'
+                        )}
+                      >
+                        {p}
+                      </button>
+                    </span>
+                  ))}
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
