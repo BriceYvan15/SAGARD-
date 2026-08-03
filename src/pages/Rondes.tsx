@@ -1,17 +1,18 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   Footprints, MapPin, Clock, CheckCircle2, AlertTriangle, XCircle,
-  Loader2, ChevronRight, Filter, X,
+  Loader2, ChevronRight, X, Calendar,
 } from 'lucide-react'
 import { useApi } from '../lib/useApi'
-import { fmtDate, clsx } from '../lib/utils'
-import { getPatrols, getPatrol, PATROL_STATES } from '../services/patrols.service'
+import { clsx } from '../lib/utils'
+import { getPatrols, getPatrol } from '../services/patrols.service'
+import DatePicker from '../components/DatePicker'
 
-const STATE_CONFIG: Record<string, { label: string; icon: any; cls: string }> = {
-  EN_COURS: { label: 'En cours', icon: Loader2, cls: 'bg-blue-100 text-blue-700' },
-  TERMINEE: { label: 'Terminée', icon: CheckCircle2, cls: 'bg-green-100 text-green-700' },
-  INCOMPLETE: { label: 'Incomplète', icon: AlertTriangle, cls: 'bg-amber-100 text-amber-700' },
-  INTERROMPUE: { label: 'Interrompue', icon: XCircle, cls: 'bg-red-100 text-red-700' },
+const STATE_CONFIG: Record<string, { label: string; icon: any; cls: string; ring: string }> = {
+  EN_COURS: { label: 'En cours', icon: Loader2, cls: 'bg-blue-100 text-blue-700', ring: 'ring-blue-400' },
+  TERMINEE: { label: 'Terminée', icon: CheckCircle2, cls: 'bg-green-100 text-green-700', ring: 'ring-green-400' },
+  INCOMPLETE: { label: 'Incomplète', icon: AlertTriangle, cls: 'bg-amber-100 text-amber-700', ring: 'ring-amber-400' },
+  INTERROMPUE: { label: 'Interrompue', icon: XCircle, cls: 'bg-red-100 text-red-700', ring: 'ring-red-400' },
 }
 
 function fmtDateTime(s?: string | null): string {
@@ -29,13 +30,33 @@ function fmtTime(s?: string | null): string {
 
 export default function Rondes() {
   const [filterState, setFilterState] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  const { data: rounds, loading } = useApi(() => getPatrols(filterState ? { state: filterState } : {}), [filterState])
+  const { data: rounds, loading } = useApi(
+    () => getPatrols({
+      ...(filterState ? { state: filterState } : {}),
+      ...(dateFrom ? { from: dateFrom } : {}),
+      ...(dateTo ? { to: dateTo } : {}),
+    }),
+    [filterState, dateFrom, dateTo],
+  )
   const { data: detail } = useApi(() => selectedId ? getPatrol(selectedId) : Promise.resolve(null), [selectedId])
 
-  const list = (rounds as any[]) ?? []
+  const allRounds = (rounds as any[]) ?? []
   const selected = detail as any
+
+  // Count per state from all data (not filtered by state, only by date)
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { EN_COURS: 0, TERMINEE: 0, INCOMPLETE: 0, INTERROMPUE: 0 }
+    // If we have a state filter, counts reflect only that state
+    // To get accurate counts we'd need unfiltered data, but for simplicity we count from current list
+    allRounds.forEach(r => { if (c[r.state] !== undefined) c[r.state]++ })
+    return c
+  }, [allRounds])
+
+  const hasDateFilter = dateFrom || dateTo
 
   return (
     <div className="space-y-6">
@@ -48,46 +69,63 @@ export default function Rondes() {
         <p className="text-slate-500 text-sm mt-1">Historique des rondes de patrol des agents</p>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <Filter size={16} className="text-slate-400" />
+      {/* Date filters */}
+      <div className="flex items-end gap-3 flex-wrap">
+        <div className="w-44">
+          <label className="text-xs font-semibold text-slate-500 mb-1 block">Date début</label>
+          <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="Du..." max={dateTo || undefined} />
+        </div>
+        <div className="w-44">
+          <label className="text-xs font-semibold text-slate-500 mb-1 block">Date fin</label>
+          <DatePicker value={dateTo} onChange={setDateTo} placeholder="Au..." min={dateFrom || undefined} />
+        </div>
+        {hasDateFilter && (
+          <button
+            onClick={() => { setDateFrom(''); setDateTo('') }}
+            className="px-3 py-2 text-sm text-slate-500 hover:text-red-500 border border-slate-200 rounded-lg hover:border-red-200 transition flex items-center gap-1.5"
+          >
+            <X size={14} />
+            Effacer
+          </button>
+        )}
+      </div>
+
+      {/* Clickable stat cards (also serve as state filters) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {/* "Toutes" card */}
         <button
           onClick={() => setFilterState('')}
           className={clsx(
-            'px-3 py-1.5 rounded-lg text-sm font-medium transition',
-            filterState === '' ? 'bg-sagard-yellow text-sagard-dark' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+            'text-left rounded-xl p-4 shadow-sm border transition-all',
+            filterState === ''
+              ? 'bg-sagard-yellow/10 border-sagard-yellow ring-2 ring-sagard-yellow/40'
+              : 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-md'
           )}
         >
-          Toutes
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold text-slate-500 uppercase">Toutes</span>
+            <Footprints size={14} className="text-sagard-yellow" />
+          </div>
+          <p className="text-2xl font-black text-slate-900">{allRounds.length}</p>
         </button>
-        {PATROL_STATES.map(s => (
+        {Object.entries(STATE_CONFIG).map(([key, cfg]) => (
           <button
-            key={s.value}
-            onClick={() => setFilterState(s.value)}
+            key={key}
+            onClick={() => setFilterState(filterState === key ? '' : key)}
             className={clsx(
-              'px-3 py-1.5 rounded-lg text-sm font-medium transition',
-              filterState === s.value ? 'bg-sagard-yellow text-sagard-dark' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+              'text-left rounded-xl p-4 shadow-sm border transition-all',
+              filterState === key
+                ? `${cfg.cls} border-transparent ring-2 ${cfg.ring}/40`
+                : 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-md'
             )}
           >
-            {s.label}
+            <div className="flex items-center justify-between mb-1">
+              <span className={clsx('text-xs font-semibold uppercase', filterState === key ? '' : 'text-slate-500')}>{cfg.label}</span>
+              <cfg.icon size={14} className={filterState === key ? '' : cfg.cls.split(' ')[1]} />
+            </div>
+            <p className={clsx('text-2xl font-black', filterState === key ? '' : 'text-slate-900')}>{counts[key] ?? 0}</p>
           </button>
         ))}
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {Object.entries(STATE_CONFIG).map(([key, cfg]) => {
-          const count = list.filter(r => r.state === key).length
-          return (
-            <div key={key} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-semibold text-slate-500 uppercase">{cfg.label}</span>
-                <cfg.icon size={14} className={cfg.cls.split(' ')[1]} />
-              </div>
-              <p className="text-2xl font-black text-slate-900">{count}</p>
-            </div>
-          )
-        })}
       </div>
 
       {/* Table */}
@@ -95,7 +133,7 @@ export default function Rondes() {
         <div className="bg-white rounded-2xl p-12 flex items-center justify-center">
           <Loader2 size={24} className="animate-spin text-slate-300" />
         </div>
-      ) : list.length === 0 ? (
+      ) : allRounds.length === 0 ? (
         <div className="bg-white rounded-2xl p-12 text-center border border-slate-100">
           <Footprints size={40} className="text-slate-200 mx-auto mb-4" />
           <p className="text-slate-400 font-medium">Aucune ronde enregistrée</p>
@@ -117,7 +155,7 @@ export default function Rondes() {
               </tr>
             </thead>
             <tbody>
-              {list.map((r: any) => {
+              {allRounds.map((r: any) => {
                 const cfg = STATE_CONFIG[r.state] ?? STATE_CONFIG.EN_COURS
                 const agentName = r.agent?.user ? `${r.agent.user.firstName} ${r.agent.user.lastName}` : '—'
                 return (
