@@ -61,7 +61,7 @@ export default function Clients() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [actionMenu, setActionMenu] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top?: number; bottom?: number; left?: number } | null>(null)
-  const actionBtnRef = useRef<HTMLButtonElement | null>(null)
+  const actionBtnRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const nav = useNavigate()
@@ -436,11 +436,11 @@ export default function Clients() {
                         </td>
                         {/* Actions menu */}
                         <td className="px-2 py-3 relative">
-                          <button ref={actionBtnRef} onClick={() => {
+                          <button ref={el => { actionBtnRefs.current[client.id] = el }} onClick={() => {
                             if (actionMenu === client.id) {
                               setActionMenu(null)
                             } else {
-                              const rect = actionBtnRef.current?.getBoundingClientRect()
+                              const rect = actionBtnRefs.current[client.id]?.getBoundingClientRect()
                               if (rect) {
                                 const spaceBelow = window.innerHeight - rect.bottom
                                 const spaceAbove = rect.top
